@@ -600,12 +600,13 @@ void World::ConsumeQueue( unsigned int queue_num )
       Event ev( queue.top() );
       if( ev.time > sim_time ) break;
       queue.pop();
-			
-      //printf( "Q%d @ %llu next event ptr %p cb %p\n", queue_num, sim_time, ev.mod, ev.cb );
+      
+      //printf( "@ %llu next event ptr %p\n", sim_time, ev.mod );
       //std::string modelType = ev.mod->GetModelType();
       //printf( "@ %llu next event <%s %llu %s>\n",  sim_time, modelType.c_str(), ev.time, ev.mod->Token() ); 
       
-			ev.cb( ev.mod, ev.arg); // call the event's callback on the model			
+      if( ev.mod->subs > 0 ) // no subscriptions means the event is discarded
+        ev.mod->Update(); // update the model
     }
   while( !queue.empty() );
 }
