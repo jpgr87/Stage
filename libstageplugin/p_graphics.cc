@@ -232,8 +232,11 @@ int InterfaceGraphics2d::ProcessMessage(QueuePointer & resp_queue,
 			PLAYER_GRAPHICS2D_CMD_POINTS, this->addr)
 			|| Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 					PLAYER_GRAPHICS2D_CMD_POLYLINE, this->addr)
+// Draw Multiline is new in Player 3.1, this ifdef allows Stage to build against older versions of Player
+#if defined PLAYER_GRAPHICS2D_CMD_MULTILINE
 			|| Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
                                         PLAYER_GRAPHICS2D_CMD_MULTILINE, this->addr)
+#endif
 			|| Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 					PLAYER_GRAPHICS2D_CMD_POLYGON, this->addr)) {
 		Message msg(*hdr, data);
@@ -273,7 +276,8 @@ void PlayerGraphics2dVis::RenderItem(Message & item) {
 		glEnd();
 	}
 		break;
-
+// Draw Multiline is new in Player 3.1, this ifdef allows Stage to build against older versions of Player
+#if defined PLAYER_GRAPHICS2D_CMD_MULTILINE
         case PLAYER_GRAPHICS2D_CMD_MULTILINE: {
                 player_graphics2d_cmd_multiline_t
                                 & data =
@@ -286,7 +290,7 @@ void PlayerGraphics2dVis::RenderItem(Message & item) {
         }
                 break;
 
-
+#endif
 
 
 
