@@ -13,6 +13,7 @@ set( stagepluginSrcs
 	     p_fiducial.cc
 	     p_position.cc
 	     p_ranger.cc			 
+	     p_power.cc
 	     p_speech.cc
 	     p_graphics.cc
 	     stg_time.cc
