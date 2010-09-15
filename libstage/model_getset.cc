@@ -115,6 +115,7 @@ void Model::SetGlobalPose( const Pose& gpose )
 
 int Model::SetParent( Model* newparent)
 {  
+
   Pose oldPose = GetGlobalPose();
 
   // remove the model from its old parent (if it has one)
