@@ -198,6 +198,9 @@ void ModelActuator::Update( void  )
 						CurrentPose.z - InitialPose.z,
 						CurrentPose.a - InitialPose.a );
 
+	cosa = cos(InitialPose.a);
+	sina = sin(InitialPose.a);
+
 	switch (actuator_type)
 	{
 		case TYPE_LINEAR:
