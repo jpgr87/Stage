@@ -2638,21 +2638,46 @@ namespace Stg
 	 void CommandDown() { SetCommand( CMD_DOWN ); }
   };
 
+  // BUMPER MODEL --------------------------------------------------------
 
-  // \todo BUMPER MODEL --------------------------------------------------------
+     typedef struct
+     {
+       Pose pose;
+       stg_meters_t length;
+     } stg_bumper_config_t;
 
-  //   typedef struct
-  //   {
-  //     Pose pose;
-  //     meters_t length;
-  //   } bumper_config_t;
+     typedef struct
+     {
+       Model* hit;
+       stg_point_t hit_point;
+     } stg_bumper_sample_t;
+  class ModelBumper : public Model
+  {
+  protected:
 
-  //   typedef struct
-  //   {
-  //     Model* hit;
-  //     point_t hit_point;
-  //   } bumper_sample_t;
+	 virtual void Startup(); // HH: OK
+	 virtual void Shutdown(); // HH: OK
+	 virtual void Update();
+	 virtual void DataVisualize( Camera* cam );
 
+  public:
+	 static const char* typestr;
+
+	 // constructor
+	 ModelBumper( World* world, Model* parent, const std::string& type ); // HH: OK
+	 // destructor
+	 virtual ~ModelBumper(); // HH: OK
+
+	 virtual void Load(); // HH: OK
+	 virtual void Print( char* prefix );
+
+	 uint32_t bumper_count;
+	 stg_bumper_config_t* bumpers;
+	 stg_bumper_sample_t* samples;
+
+  private:
+	 static Option showBumperData;
+  };
 
   // FIDUCIAL MODEL --------------------------------------------------------
 
