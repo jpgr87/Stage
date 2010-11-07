@@ -2347,7 +2347,7 @@ namespace Stg
 	 Geom GetGeom() const { return geom; }
 
 	 /** Get the Map Resolution */
-	 stg_meters_t GetMapResolution() { return map_resolution;}
+	 meters_t GetMapResolution() { return map_resolution;}
 	
 	 /** Get (a copy of) the pose of a model in its parent's coordinate
 		  system.  */
@@ -2646,14 +2646,14 @@ namespace Stg
      typedef struct
      {
        Pose pose;
-       stg_meters_t length;
-     } stg_bumper_config_t;
+       meters_t length;
+     } bumper_config_t;
 
      typedef struct
      {
        Model* hit;
-       stg_point_t hit_point;
-     } stg_bumper_sample_t;
+       point_t hit_point;
+     } bumper_sample_t;
   class ModelBumper : public Model
   {
   protected:
@@ -2675,8 +2675,8 @@ namespace Stg
 	 virtual void Print( char* prefix );
 
 	 uint32_t bumper_count;
-	 stg_bumper_config_t* bumpers;
-	 stg_bumper_sample_t* samples;
+	 bumper_config_t* bumpers;
+	 bumper_sample_t* samples;
 
   private:
 	 static Option showBumperData;
