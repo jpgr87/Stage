@@ -51,19 +51,21 @@ InterfaceMap::InterfaceMap( player_devaddr_t addr,
 
 // Handle map info request - adapted from Player's mapfile driver by
 // Brian Gerkey
-int  InterfaceMap::HandleMsgReqInfo( MessageQueue* resp_queue,
-				      player_msghdr_t* hdr,
-				      void* data)
+int  InterfaceMap::HandleMsgReqInfo( QueuePointer & resp_queue,
+		player_msghdr * hdr,
+		void * data )
 {
-  printf( "Stage: device \"%s\" received map info request\n", 
-	  this->mod->token );
+  printf( "Stage: device \"%s\" received map info request\n",
+		  this->mod->Token());
+
+
   
   // create and render a map for this model
-  Geom geom;
-  model_get_geom( this->mod, &geom );
+  Stg::Geom geom;
+  geom = this->mod->GetGeom();
   
   
-  double mres = this->mod->map_resolution;
+  double mres = this->mod->GetMapResolution();
 
   // size_t sz=0;
 //   polygon_t* polys = (polygon_t*)
@@ -74,17 +76,18 @@ int  InterfaceMap::HandleMsgReqInfo( MessageQueue* resp_queue,
   // prepare the map info for the client
   player_map_info_t info;  
 
-  info.scale = mres;;
+  info.scale = mres;
   
   // size in pixels
   info.width = (uint32_t)(geom.size.x / mres);
   info.height = (uint32_t)(geom.size.y / mres);
   
   // origin of map center in global coords
-  Pose global;
+  Stg::Pose global;
   memcpy( &global, &geom.pose, sizeof(global)); 
-  model_local_to_global( this->mod, &global );
  
+  global =  this->mod->LocalToGlobal( &geom.pose );
+
   // get real-world pose of lower-left corner of map (this is what Player
   // calls the 'origin'
   info.origin.px = geom.pose.x - geom.size.x / 2.0;
@@ -92,7 +95,7 @@ int  InterfaceMap::HandleMsgReqInfo( MessageQueue* resp_queue,
   info.origin.pa = geom.pose.a;
 
   printf( "Stage: creating map for model \"%s\" of %d by %d cells at res %.2f\n", 
-	  this->mod->token, 
+	  this->mod->Token(),
 	  info.width, info.height, info.scale );
        
   this->driver->Publish(this->addr, resp_queue,
@@ -145,16 +148,16 @@ void render_line( int8_t* buf,
 
 
 // Handle map data request
-int InterfaceMap::HandleMsgReqData( MessageQueue* resp_queue,
-				     player_msghdr_t* hdr,
-				     void* data)
+int InterfaceMap::HandleMsgReqData( QueuePointer & resp_queue,
+		player_msghdr * hdr,
+		void * data )
 {
   // printf( "device %s received map data request\n", this->mod->token );
   
-  Geom geom;
-  model_get_geom( this->mod, &geom );
+  Stg::Geom geom;
+  geom = this->mod->GetGeom( );
   
-  double mres = this->mod->map_resolution;
+  double mres = this->mod->GetMapResolution();
   
   // request packet
   player_map_data_t* mapreq = (player_map_data_t*)data;  
@@ -171,7 +174,7 @@ int InterfaceMap::HandleMsgReqData( MessageQueue* resp_queue,
   sj = mapresp->height =  mapreq->height;
   
   // initiall all cells are 'empty'
-  memset( mapresp->data, -1, sizeof(uint8_t) * PLAYER_MAP_MAX_TILE_SIZE );
+  memset( mapresp->data, -1, sizeof(uint8_t) * mapresp->width * mapresp->height );
 
   printf( "Stage computing map tile (%d,%d)(%d,%d)...",
    	  oi, oj, si, sj);
@@ -241,9 +244,9 @@ int InterfaceMap::HandleMsgReqData( MessageQueue* resp_queue,
    return(0);
 }
 
-int InterfaceMap::ProcessMessage(MessageQueue* resp_queue,
-				 player_msghdr_t* hdr,
-				 void* data)
+int InterfaceMap::ProcessMessage(QueuePointer & resp_queue,
+		player_msghdr * hdr,
+		void * data )
 {
   // printf( "Stage map interface processing message\n" );
 
