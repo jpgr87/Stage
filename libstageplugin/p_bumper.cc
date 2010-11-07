@@ -58,7 +58,7 @@ void InterfaceBumper::Publish( void )
 	player_bumper_data_t bumper;
 	memset( &bumper, 0, sizeof(bumper) );
 
-	stg_bumper_sample_t* sdata = (stg_bumper_sample_t*)mod->samples;
+	bumper_sample_t* sdata = (bumper_sample_t*)mod->samples;
 
 	size_t count = mod->bumper_count;
 
@@ -128,7 +128,7 @@ int InterfaceBumper::ProcessMessage( QueuePointer & resp_queue,
 	else
 	{
 		// Don't know how to handle this message.
-		PRINT_WARN2( "stg_bumper doesn't support msg with type/subtype %d/%d",
+		PRINT_WARN2( "bumper doesn't support msg with type/subtype %d/%d",
 				hdr->type, hdr->subtype);
 		return(-1);
 	}

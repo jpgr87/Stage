@@ -57,11 +57,11 @@ using namespace Stg;
 
 #include <math.h>
 
-static const stg_watts_t STG_BUMPER_WATTS = 0.1; // bumper power consumption
-static const char* STG_BUMPER_HIT_COLOR = "red"; // red
-static const char* STG_BUMPER_NOHIT_COLOR = "green"; // green
-static const stg_meters_t STG_BUMPER_HIT_THICKNESS = 0.02;
-static const stg_meters_t STG_BUMPER_NOHIT_THICKNESS = 0.01;
+static const watts_t BUMPER_WATTS = 0.1; // bumper power consumption
+static const char* BUMPER_HIT_COLOR = "red"; // red
+static const char* BUMPER_NOHIT_COLOR = "green"; // green
+static const meters_t BUMPER_HIT_THICKNESS = 0.02;
+static const meters_t BUMPER_NOHIT_THICKNESS = 0.01;
 static const Size DEFAULT_SIZE( 0.1, 0.1, 0.1 );
 
 
@@ -77,7 +77,7 @@ ModelBumper::ModelBumper( World* world,
 
   // Set up sensible defaults
   SetGeom( Geom( Pose(0,0,0,0), DEFAULT_SIZE ) );
-  SetColor( Color( STG_BUMPER_NOHIT_COLOR ) );
+  SetColor( Color( BUMPER_NOHIT_COLOR ) );
 
   // assert that Update() is reentrant for this derived model
   thread_safe = true;
@@ -104,7 +104,7 @@ void ModelBumper::Startup( void )
 
   PRINT_DEBUG( "bumper startup" );
 
-  this->SetWatts( STG_BUMPER_WATTS );
+  this->SetWatts( BUMPER_WATTS );
 }
 
 
@@ -136,9 +136,9 @@ void ModelBumper::Load( void )
       char key[256];
 
       if( bumpers ) delete [] bumpers;
-      bumpers = new stg_bumper_config_t[bumper_count];
+      bumpers = new bumper_config_t[bumper_count];
 
-      stg_meters_t common_length;
+      meters_t common_length;
       common_length = wf->ReadLength( wf_entity, "blength", 0 );
 
       // set all transducers with the common settings
@@ -183,7 +183,7 @@ void ModelBumper::Update( void )
     return;
 
   if( samples ==  NULL )
-    samples = new stg_bumper_sample_t[bumper_count];
+    samples = new bumper_sample_t[bumper_count];
   assert( samples );
 
   for( unsigned int t=0; t<bumper_count; t++ )
@@ -201,7 +201,7 @@ void ModelBumper::Update( void )
 					    NULL );
       samples[t].hit = ray.mod;
       if (ray.mod) {
-        samples[t].hit_point = stg_point_t(ray.pose.x, ray.pose.y);
+        samples[t].hit_point = point_t(ray.pose.x, ray.pose.y);
       }
     }
 }
