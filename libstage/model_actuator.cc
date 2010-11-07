@@ -155,6 +155,9 @@ void ModelActuator::Load( void )
 		
 		Pose DesiredPose = InitialPose;
 		
+		cosa = cos(InitialPose.a);
+		sina = sin(InitialPose.a);
+		
 		switch (actuator_type)
 		  {
 		  case TYPE_LINEAR:

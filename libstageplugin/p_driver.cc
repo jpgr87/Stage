@@ -248,6 +248,9 @@ InterfaceModel::InterfaceModel(  player_devaddr_t addr,
 				   &addr,
 				   type );
 
+  // Use same update interval as the model
+  this->publish_interval_msec = this->mod->GetUpdateInterval()/1000;
+    
   if( !this->mod )
     {
       printf( " ERROR! no model available for this device."
@@ -345,8 +348,9 @@ StgDriver::StgDriver(ConfigFile* cf, int section)
 		ifsrc = new InterfaceFiducial( player_addr,  this, cf, section );
 		break;
 
+	case PLAYER_SONAR_CODE: // drop through as we use the same interface
 	case PLAYER_LASER_CODE:
-		ifsrc = new InterfaceLaser( player_addr,  this, cf, section );
+		ifsrc = new InterfaceRanger( player_addr,  this, cf, section );
 		break;
 
 	case PLAYER_POSITION2D_CODE:
@@ -356,10 +360,6 @@ StgDriver::StgDriver(ConfigFile* cf, int section)
 	case PLAYER_SIMULATION_CODE:
 	  ifsrc = new InterfaceSimulation( player_addr, this, cf, section );
 	  break;
-
-	case PLAYER_SONAR_CODE:
- 	  ifsrc = new InterfaceSonar( player_addr,  this, cf, section );
- 	  break;
 
 	case PLAYER_SPEECH_CODE:
 		ifsrc = new InterfaceSpeech( player_addr,  this, cf, section );
@@ -596,7 +596,7 @@ void StgDriver::Update(void)
 			switch( interface->addr.interf )
 				{
 				case PLAYER_SIMULATION_CODE:
-				  // one round of FLTK's update loop.
+					// one round of FLTK's update loop.
 					if (StgDriver::usegui)
 						Fl::wait();
 					else

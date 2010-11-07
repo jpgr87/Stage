@@ -78,6 +78,8 @@ InterfaceSimulation::InterfaceSimulation( player_devaddr_t addr,
 
 	Stg::Init( &player_argc, &player_argv );
 
+	StgDriver::usegui = cf->ReadBool(section, "usegui", 1 );
+
 	const char* worldfile_name = cf->ReadString(section, "worldfile", NULL );
         StgDriver::usegui = cf->ReadBool(section, "usegui", 1 );
 
@@ -113,12 +115,12 @@ InterfaceSimulation::InterfaceSimulation( player_devaddr_t addr,
 
 	// create a passel of Stage models in the local cache based on the
 	// worldfile
-
+	
 	// if the initial size is to large this crashes on some systems
 	StgDriver::world = ( StgDriver::usegui ? new WorldGui( 400, 300, worldfile_name ) : new World(worldfile_name));
 	assert(StgDriver::world);
-
 	puts("");
+
 	StgDriver::world->Load( fullname );
 	//printf( " done.\n" );
 
@@ -127,7 +129,7 @@ InterfaceSimulation::InterfaceSimulation( player_devaddr_t addr,
 	//     {
 	//       char txt[128];
 	//       snprintf( txt, 128, "Player/Stage: %s", StgDriver::world->token );
-	//       StgDriverstg_world_set_title(StgDriver::world, txt );
+	//       StgDriverworld_set_title(StgDriver::world, txt );
 	//     }
 
 	// steal the global clock - a bit aggressive, but a simple approach
@@ -137,7 +139,7 @@ InterfaceSimulation::InterfaceSimulation( player_devaddr_t addr,
 	assert(GlobalTime);
 	// start the simulation
 	// printf( "  Starting world clock... " ); fflush(stdout);
-	//stg_world_resume( world );
+	//world_resume( world );
 
 	StgDriver::world->Start();
 
@@ -439,7 +441,7 @@ int InterfaceSimulation::ProcessMessage(QueuePointer &resp_queue,
 	else
 	{
 		// Don't know how to handle this message.
-		PRINT_WARN2( "stg_simulation doesn't support msg with type/subtype %d/%d",
+		PRINT_WARN2( "simulation doesn't support msg with type/subtype %d/%d",
 				hdr->type, hdr->subtype);
 		return(-1);
 	}

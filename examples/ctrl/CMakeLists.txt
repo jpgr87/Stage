@@ -4,8 +4,8 @@ SET( PLUGINS
      sink
      source
      wander
-	  wander_pioneer
-	  pioneer_flocking
+#	  wander_pioneer
+#	  pioneer_flocking
      rasterize
 	  dynamic
 )
@@ -23,9 +23,11 @@ foreach( PLUGIN ${PLUGINS} )
 endforeach( PLUGIN )
 				
 ADD_LIBRARY( fasr2 MODULE fasr2.cc astar/findpath.cpp )
+#ADD_LIBRARY( energy MODULE energy.cc astar/findpath.cpp )
 
-# add fasr2 to the list of plugins
+# add extras to the list of plugins
 SET( PLUGINS ${PLUGINS} fasr2 )
+#SET( PLUGINS ${PLUGINS} energy)
 
 set_source_files_properties( ${PLUGINS} PROPERTIES COMPILE_FLAGS "${FLTK_CFLAGS}" )
 

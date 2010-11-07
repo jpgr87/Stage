@@ -29,11 +29,11 @@
 // DOCUMENTATION ------------------------------------------------------------
 
 /** @addtogroup player
-@par Laser interface
-- PLAYER_LASER_DATA_SCAN
-- PLAYER_LASER_REQ_SET_CONFIG
-- PLAYER_LASER_REQ_GET_CONFIG
-- PLAYER_LASER_REQ_GET_GEOM
+@par Ranger interface
+- PLAYER_RANGER_DATA_SCAN
+- PLAYER_RANGER_REQ_SET_CONFIG
+- PLAYER_RANGER_REQ_GET_CONFIG
+- PLAYER_RANGER_REQ_GET_GEOM
 */
 
 // CODE ----------------------------------------------------------------------
@@ -41,30 +41,52 @@
 #include "p_driver.h"
 using namespace Stg;
 
-InterfaceLaser::InterfaceLaser( player_devaddr_t addr,
+InterfaceRanger::InterfaceRanger( player_devaddr_t addr,
 				StgDriver* driver,
 				ConfigFile* cf,
 				int section )
-  : InterfaceModel( addr, driver, cf, section, "laser" )
+  : InterfaceModel( addr, driver, cf, section, "ranger" )
 {
   this->scan_id = 0;
 }
 
-void InterfaceLaser::Publish( void )
+void InterfaceRanger::Publish( void )
 {
-  ModelLaser* mod = (ModelLaser*)this->mod;
-  
-  const std::vector<ModelLaser::Sample>& samples = mod->GetSamples();
+  ModelRanger* rgr = dynamic_cast<ModelRanger*>(this->mod);
+	
+  const std::vector<ModelRanger::Sensor::Sample>& samples = rgr->GetSamples();
   
   uint32_t sample_count = samples.size();
   // don't publish anything until we have some real data
   if( sample_count == 0 )
     return;
+	
+  // Write range data
+	player_ranger_data_range_t prange;
+  memset( &prange, 0, sizeof(prange) );  
+	prange.ranges = &samples[0];
+	prange.ranges_count = samples.size();
+	
+  this->driver->Publish(this->addr,
+												PLAYER_MSGTYPE_DATA,
+												PLAYER_RANGER_DATA_RANGE,
+												(void*)&prange, sizeof(prange), NULL);
+	
 
-  player_laser_data_t pdata;
-  memset( &pdata, 0, sizeof(pdata) );
-  
-  ModelLaser::Config cfg = mod->GetConfig();
+  // Write intensity data
+	player_ranger_data_intns_t pintens;
+  memset( &pintensity, 0, sizeof(pintens) );	
+	pntens.intensities = &intens[0];
+	
+	pintens.intensities_count = intens.size();
+	this->driver->Publish(this->addr,
+												PLAYER_MSGTYPE_DATA,
+												PLAYER_RANGER_DATA_INTNS,
+												(void*)&pintens, sizeof(pintens), NULL);
+
+	// todo: shouldn't this be published?
+	
+  const ModelRanger::Config& cfg = rgr->cfg;
   pdata.min_angle = -cfg.fov/2.0;
   pdata.max_angle = +cfg.fov/2.0;
   pdata.resolution = cfg.fov / cfg.sample_count;
@@ -74,55 +96,30 @@ void InterfaceLaser::Publish( void )
 
   pdata.ranges = new float[pdata.ranges_count];
   pdata.intensity = new uint8_t[pdata.ranges_count];
-
-  for( unsigned int i=0; i<cfg.sample_count; i++ )
-    {
-      //printf( "range %d %d\n", i, samples[i].range);
-      pdata.ranges[i] = samples[i].range;
-      pdata.intensity[i] = (uint8_t)samples[i].reflectance;
-    }
-
-  // Write laser data
-  this->driver->Publish(this->addr,
-			PLAYER_MSGTYPE_DATA,
-			PLAYER_LASER_DATA_SCAN,
-			(void*)&pdata, sizeof(pdata), NULL);
-
-  delete [] pdata.ranges;
-  delete [] pdata.intensity;
-
-
-	// publish ranger data
-	this->driver->Publish(this->addr,
-												PLAYER_MSGTYPE_DATA,
-												PLAYER_LASER_RANGERDATA_SCAN,
-												(void*)&pdata, sizeof(pdata), NULL);
-	
-
 }
 
-int InterfaceLaser::ProcessMessage(QueuePointer & resp_queue,
+int InterfaceRanger::ProcessMessage(QueuePointer & resp_queue,
 				   player_msghdr_t* hdr,
 				   void* data)
 {
-  ModelLaser* mod = (ModelLaser*)this->mod;
+  ModelRanger* mod = (ModelRanger*)this->mod;
 
-  // Is it a request to set the laser's config?
+  // Is it a request to set the ranger's config?
   if(Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
-                           PLAYER_LASER_REQ_SET_CONFIG,
+                           PLAYER_RANGER_REQ_SET_CONFIG,
                            this->addr))
   {
 
-    player_laser_config_t* plc = (player_laser_config_t*)data;
+    player_ranger_config_t* plc = (player_ranger_config_t*)data;
 
-    if( hdr->size == sizeof(player_laser_config_t) )
+    if( hdr->size == sizeof(player_ranger_config_t) )
     {
       // TODO
       // int intensity = plc->intensity;
 
-      ModelLaser::Config cfg = mod->GetConfig();
+      ModelRanger::Config cfg = mod->GetConfig();
 
-	  PRINT_DEBUG3( "laser config was: resolution %d, fov %.6f, interval %d\n",
+	  PRINT_DEBUG3( "ranger config was: resolution %d, fov %.6f, interval %d\n",
 			  cfg.resolution, cfg.fov, cfg.interval );
 
 	  cfg.fov = plc->max_angle - plc->min_angle;
@@ -131,7 +128,7 @@ int InterfaceLaser::ProcessMessage(QueuePointer & resp_queue,
 		  cfg.resolution = 1;
 	  cfg.interval = (usec_t) ( 1.0E6 / plc->scanning_frequency );
 
-	  PRINT_DEBUG3( "setting laser config: resolution %d, fov %.6f, interval %d\n",
+	  PRINT_DEBUG3( "setting ranger config: resolution %d, fov %.6f, interval %d\n",
 			  cfg.resolution, cfg.fov, cfg.interval );
 
 	  // Range resolution is currently locked to the world setting
@@ -142,27 +139,27 @@ int InterfaceLaser::ProcessMessage(QueuePointer & resp_queue,
 
       this->driver->Publish(this->addr, resp_queue,
 			    PLAYER_MSGTYPE_RESP_ACK,
-			    PLAYER_LASER_REQ_SET_CONFIG);
+			    PLAYER_RANGER_REQ_SET_CONFIG);
       return(0);
     }
     else
     {
       PRINT_ERR2("config request len is invalid (%d != %d)",
-		 (int)hdr->size, (int)sizeof(player_laser_config_t));
+		 (int)hdr->size, (int)sizeof(player_ranger_config_t));
 
       return(-1);
     }
   }
-  // Is it a request to get the laser's config?
+  // Is it a request to get the ranger's config?
   else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
-                                 PLAYER_LASER_REQ_GET_CONFIG,
+                                 PLAYER_RANGER_REQ_GET_CONFIG,
                                  this->addr))
   {
     if( hdr->size == 0 )
     {
-      ModelLaser::Config cfg = mod->GetConfig();
+      ModelRanger::Config cfg = mod->GetConfig();
 
-      player_laser_config_t plc;
+      player_ranger_config_t plc;
       memset(&plc,0,sizeof(plc));
       plc.min_angle = -cfg.fov/2.0;
       plc.max_angle = +cfg.fov/2.0;
@@ -174,7 +171,7 @@ int InterfaceLaser::ProcessMessage(QueuePointer & resp_queue,
 
       this->driver->Publish(this->addr, resp_queue,
 			    PLAYER_MSGTYPE_RESP_ACK,
-			    PLAYER_LASER_REQ_GET_CONFIG,
+			    PLAYER_RANGER_REQ_GET_CONFIG,
 			    (void*)&plc, sizeof(plc), NULL);
       return(0);
     }
@@ -184,9 +181,9 @@ int InterfaceLaser::ProcessMessage(QueuePointer & resp_queue,
       return(-1);
     }
   }
-  // Is it a request to get the laser's geom?
+  // Is it a request to get the ranger's geom?
   else if (Message::MatchMessage(hdr, PLAYER_MSGTYPE_REQ,
-                                 PLAYER_LASER_REQ_GET_GEOM,
+                                 PLAYER_RANGER_REQ_GET_GEOM,
                                  this->addr))
   {
     if(hdr->size == 0)
@@ -196,7 +193,7 @@ int InterfaceLaser::ProcessMessage(QueuePointer & resp_queue,
       Pose pose = this->mod->GetPose();
 
       // fill in the geometry data formatted player-like
-      player_laser_geom_t pgeom;
+      player_ranger_geom_t pgeom;
       pgeom.pose.px = pose.x;
       pgeom.pose.py = pose.y;
       pgeom.pose.pyaw = pose.a;
@@ -205,7 +202,7 @@ int InterfaceLaser::ProcessMessage(QueuePointer & resp_queue,
 
       this->driver->Publish(this->addr, resp_queue,
 			    PLAYER_MSGTYPE_RESP_ACK,
-			    PLAYER_LASER_REQ_GET_GEOM,
+			    PLAYER_RANGER_REQ_GET_GEOM,
 			    (void*)&pgeom, sizeof(pgeom), NULL);
       return(0);
     }
@@ -217,7 +214,7 @@ int InterfaceLaser::ProcessMessage(QueuePointer & resp_queue,
   }
 
   // Don't know how to handle this message.
-  PRINT_WARN2( "stage laser doesn't support message %d:%d.",
+  PRINT_WARN2( "stage ranger doesn't support message %d:%d.",
 	       hdr->type, hdr->subtype);
   return(-1);
 }

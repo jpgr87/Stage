@@ -16,7 +16,7 @@ using namespace Stg;
 
 typedef struct
 {
-	ModelLaser* laser;
+	ModelRanger* laser;
 	ModelPosition* position;
 	ModelRanger* ranger;
 } robot_t;
@@ -42,7 +42,7 @@ extern "C" int Init( Model* mod )
 
 
   // ask Stage to call into our ranger update function
-  robot->ranger->AddCallback( Model::CB_UPDATE, (stg_model_callback_t)RangerUpdate, robot );
+  robot->ranger->AddCallback( Model::CB_UPDATE, (model_callback_t)RangerUpdate, robot );
 
   // subscribe to the laser, though we don't use it for navigating
   //robot->laser = (ModelLaser*)mod->GetUnusedModelofType( "laser" );
@@ -66,8 +66,8 @@ int RangerUpdate( ModelRanger* rgr, robot_t* robot )
   FOR_EACH( it, sensors )
 	 {
 		const ModelRanger::Sensor& s = *it;
-		dx += s.range * cos( s.pose.a );
-		dy += s.range * sin( s.pose.a );
+		dx += s.ranges[0] * cos( s.pose.a );
+		dy += s.ranges[0] * sin( s.pose.a );
 		
 		//printf( "sensor %d angle= %.2f\n", s, rgr->sensors[s].pose.a );	 
 	 }
@@ -83,15 +83,15 @@ int RangerUpdate( ModelRanger* rgr, robot_t* robot )
   //printf( "resultant %.2f turn_speed %.2f\n", resultant_angle, turn_speed );
 
   // if the front is clear, drive forwards
-  if( (sensors[0].range > SAFE_DIST) &&
+  if( (sensors[0].ranges[0] > SAFE_DIST) &&
 
-		(sensors[1].range > SAFE_DIST/1.5) &&
-		(sensors[2].range > SAFE_DIST/3.0) && 
-		(sensors[3].range > SAFE_DIST/5.0) && 
+		(sensors[1].ranges[0] > SAFE_DIST/1.5) &&
+		(sensors[2].ranges[0] > SAFE_DIST/3.0) && 
+		(sensors[3].ranges[0] > SAFE_DIST/5.0) && 
 
-		(sensors[9].range > SAFE_DIST/5.0) && 
-		(sensors[10].range > SAFE_DIST/3.0) && 
-		(sensors[11].range > SAFE_DIST/1.5) && 
+		(sensors[9].ranges[0] > SAFE_DIST/5.0) && 
+		(sensors[10].ranges[0] > SAFE_DIST/3.0) && 
+		(sensors[11].ranges[0] > SAFE_DIST/1.5) && 
 		(fabs( resultant_angle ) < SAFE_ANGLE) )
 	 {
 		forward_speed = VSPEED;

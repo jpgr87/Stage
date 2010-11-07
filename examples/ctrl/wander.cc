@@ -12,7 +12,7 @@ const int avoidduration = 10;
 typedef struct
 {
   ModelPosition* pos;
-  ModelLaser* laser;
+  ModelRanger* laser;
   int avoidcount, randcount;
 } robot_t;
 
@@ -36,23 +36,27 @@ extern "C" int Init( Model* mod, CtrlArgs* args )
   robot->randcount = 0;
   
   robot->pos = (ModelPosition*)mod;
-  robot->laser = (ModelLaser*)mod->GetChild( "laser:0" );
-  robot->laser->AddCallback( Model::CB_UPDATE, (stg_model_callback_t)LaserUpdate, robot );
-  
-  robot->laser->Subscribe(); // starts the laser updates
+
+	if( verbose )
+		robot->pos->AddCallback( Model::CB_UPDATE, (model_callback_t)PositionUpdate, robot );
+
   robot->pos->Subscribe(); // starts the position updates
-    
+
+  robot->laser = (ModelRanger*)mod->GetChild( "ranger:1" );
+  robot->laser->AddCallback( Model::CB_UPDATE, (model_callback_t)LaserUpdate, robot );
+  robot->laser->Subscribe(); // starts the ranger updates
+   
   return 0; //ok
 }
 
 
-// inspect the laser data and decide what to do
+// inspect the ranger data and decide what to do
 int LaserUpdate( Model* mod, robot_t* robot )
 {
   // get the data
-	const std::vector<ModelLaser::Sample>& scan = robot->laser->GetSamples();
+	const std::vector<meters_t>& scan = robot->laser->GetRanges();
   uint32_t sample_count = scan.size();
-  if( ! sample_count < 1 )
+  if( sample_count < 1 )
     return 0;
   
   bool obstruction = false;
@@ -66,26 +70,26 @@ int LaserUpdate( Model* mod, robot_t* robot )
   for (uint32_t i = 0; i < sample_count; i++)
     {
 
-		if( verbose ) printf( "%.3f ", scan[i].range );
+		if( verbose ) printf( "%.3f ", scan[i] );
 
       if( (i > (sample_count/3)) 
 			 && (i < (sample_count - (sample_count/3))) 
-			 && scan[i].range < minfrontdistance)
+			 && scan[i] < minfrontdistance)
 		  {
 			 if( verbose ) puts( "  obstruction!" );
 			 obstruction = true;
 		  }
 		
-      if( scan[i].range < stopdist )
+      if( scan[i] < stopdist )
 		  {
 			 if( verbose ) puts( "  stopping!" );
 			 stop = true;
 		  }
       
       if( i > sample_count/2 )
-				minleft = std::min( minleft, scan[i].range );
+				minleft = std::min( minleft, scan[i] );
       else      
-				minright = std::min( minright, scan[i].range );
+				minright = std::min( minright, scan[i] );
     }
   
   if( verbose ) 
@@ -128,16 +132,16 @@ int LaserUpdate( Model* mod, robot_t* robot )
 
       robot->avoidcount = 0;
       robot->pos->SetXSpeed( cruisespeed );	  
-		robot->pos->SetTurnSpeed(  0 );
+			robot->pos->SetTurnSpeed(  0 );
     }
 
  //  if( robot->pos->Stalled() )
 // 	 {
 // 		robot->pos->SetSpeed( 0,0,0 );
 // 		robot->pos->SetTurnSpeed( 0 );
-// 	 }
-    
-  return 0;
+// }
+			
+  return 0; // run again
 }
 
 int PositionUpdate( Model* mod, robot_t* robot )

@@ -9,14 +9,11 @@ set( stagepluginSrcs
 	     p_actarray.cc
 	     p_blobfinder.cc
 	     p_bumper.cc
-		   p_gripper.cc
+	     p_gripper.cc
 	     p_simulation.cc
-	     p_laser.cc
-#	     p_map.cc
 	     p_fiducial.cc
 	     p_position.cc
 	     p_power.cc
-	     p_sonar.cc
 	     p_speech.cc
 	     p_graphics.cc
 	     stg_time.cc
@@ -24,13 +21,10 @@ set( stagepluginSrcs
 
 add_library( stageplugin MODULE ${stagepluginSrcs} )
 
-
-
 target_link_libraries( stageplugin
 		       stage
 		       ${PLAYER_LIBRARIES}
 		       ${OPENGL_LIBRARIES}
-
 )
 
 set_source_files_properties( ${stagepluginSrcs} PROPERTIES COMPILE_FLAGS "${FLTK_CFLAGS}" )

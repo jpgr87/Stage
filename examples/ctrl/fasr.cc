@@ -14,8 +14,6 @@ const int workduration = 20;
 const unsigned int payload = 1;
 
 double have[4][4] = { 
-  //  { -120, -180, 180, 180 }
-  //{ -90, -120, 180, 90 },
   { 90, 180, 180, 180 },
   { 90, -90, 180, 90 },
   { 90, 90, 180, 90 },
@@ -46,7 +44,7 @@ class Robot
 {
 private:
   ModelPosition* pos;
-  ModelLaser* laser;
+  ModelRanger* laser;
   ModelRanger* ranger;
   ModelFiducial* fiducial;
   //ModelBlobfinder* blobfinder;
@@ -66,8 +64,8 @@ public:
 			Model* source,
 			Model* sink ) 
 	 : pos(pos), 
-		laser( (ModelLaser*)pos->GetUnusedModelOfType( "laser" )),
-		ranger( (ModelRanger*)pos->GetUnusedModelOfType( "ranger" )),
+		laser( (ModelRanger*)pos->GetChild( "ranger:1" )),
+		ranger( (ModelRanger*)pos->GetChild( "ranger:0" )),
 		fiducial( (ModelFiducial*)pos->GetUnusedModelOfType( "fiducial" )),	
 		//blobfinder( (ModelBlobfinder*)pos->GetUnusedModelOfType( "blobfinder" )),
 		//gripper( (ModelGripper*)pos->GetUnusedModelOfType( "gripper" )),
@@ -93,25 +91,25 @@ public:
 	 //	 pos->GetUnusedModelOfType( "laser" );
 	 
 	 // PositionUpdate() checks to see if we reached source or sink
-	 pos->AddCallback( Model::CB_UPDATE, (stg_model_callback_t)PositionUpdate, this );
+	 pos->AddCallback( Model::CB_UPDATE, (model_callback_t)PositionUpdate, this );
 	 pos->Subscribe();
 
 	 // LaserUpdate() controls the robot, by reading from laser and
 	 // writing to position
-	 laser->AddCallback( Model::CB_UPDATE, (stg_model_callback_t)LaserUpdate, this );
+	 laser->AddCallback( Model::CB_UPDATE, (model_callback_t)LaserUpdate, this );
 	 laser->Subscribe();
 
-	 fiducial->AddCallback( Model::CB_UPDATE, (stg_model_callback_t)FiducialUpdate, this );	 	 
+	 fiducial->AddCallback( Model::CB_UPDATE, (model_callback_t)FiducialUpdate, this );	 	 
 	 fiducial->Subscribe();
 	 
-	 //gripper->AddUpdateCallback( (stg_model_callback_t)GripperUpdate, this );	 	 
+	 //gripper->AddUpdateCallback( (model_callback_t)GripperUpdate, this );	 	 
 	 //gripper->Subscribe();
 	 
-	 //blobfinder->AddUpdateCallback( (stg_model_callback_t)BlobFinderUpdate, this );
+	 //blobfinder->AddUpdateCallback( (model_callback_t)BlobFinderUpdate, this );
 	 //blobfinder->Subscribe();
 
-	 //pos->AddFlagIncrCallback( (stg_model_callback_t)FlagIncr, NULL );
-	 //pos->AddFlagDecrCallback( (stg_model_callback_t)FlagDecr, NULL );
+	 //pos->AddFlagIncrCallback( (model_callback_t)FlagIncr, NULL );
+	 //pos->AddFlagDecrCallback( (model_callback_t)FlagDecr, NULL );
 }
 
   void Dock()
@@ -174,9 +172,9 @@ public:
 
   void UnDock()
   {
-	 //const stg_meters_t gripper_distance = 0.2;
-	 const stg_meters_t back_off_distance = 0.3;
-	 const stg_meters_t back_off_speed = -0.05;
+	 //const meters_t gripper_distance = 0.2;
+	 const meters_t back_off_distance = 0.3;
+	 const meters_t back_off_speed = -0.05;
 
 	 // back up a bit
 	 if( charger_range < back_off_distance )
@@ -210,33 +208,34 @@ public:
 	 // there's anything in front
 	 double minleft = 1e6;
 	 double minright = 1e6;
-  
-	 // Get the data
-	 const std::vector<ModelLaser::Sample>& scan = laser->GetSamples();
+	 
+	 // Get the data from the first sensor of the laser 
+	 const std::vector<meters_t>& scan = laser->GetRanges();
+	 
 	 uint32_t sample_count = scan.size();
   
 	 for (uint32_t i = 0; i < sample_count; i++)
 		{		
-		  if( verbose ) printf( "%.3f ", scan[i].range );
+		  if( verbose ) printf( "%.3f ", scan[i] );
 		
 		  if( (i > (sample_count/4)) 
 				&& (i < (sample_count - (sample_count/4))) 
-				&& scan[i].range < minfrontdistance)
+				&& scan[i] < minfrontdistance)
 			 {
 				if( verbose ) puts( "  obstruction!" );
 				obstruction = true;
 			 }
 		
-		  if( scan[i].range < stopdist )
+		  if( scan[i] < stopdist )
 			 {
 				if( verbose ) puts( "  stopping!" );
 				stop = true;
 			 }
 		
 		  if( i > sample_count/2 )
-				minleft = std::min( minleft, scan[i].range );
+				minleft = std::min( minleft, scan[i] );
 		  else      
-				minright = std::min( minright, scan[i].range );
+				minright = std::min( minright, scan[i] );
 		}
   
 	 if( verbose ) 
@@ -334,13 +333,13 @@ public:
 
 
   // inspect the laser data and decide what to do
-  static int LaserUpdate( ModelLaser* laser, Robot* robot )
+  static int LaserUpdate( ModelRanger* laser, Robot* robot )
   {
 	 //   if( laser->power_pack && laser->power_pack->charging )
 	 // 	 printf( "model %s power pack @%p is charging\n",
 	 // 				laser->Token(), laser->power_pack );
 		
-		assert( laser->GetSamples().size() > 0 );
+		//assert( laser->GetSamples().size() > 0 );
 		
 	 switch( robot->mode )
 		{
@@ -495,31 +494,9 @@ public:
 // Stage calls this when the model starts up
 extern "C" int Init( Model* mod, CtrlArgs* args )
 {  
-#if 1		
-  // example using the model rasterizer
-  if( strcmp( mod->Token(), "r0" ) == 0 )
-	 {
-		const unsigned int dw = 64, dh = 32;
-		
-		uint8_t* data = new uint8_t[dw*dh*2];
-		memset( data, 0, sizeof(uint8_t) * dw * dh );
-		
-		mod->GetWorld()->GetModel( "cave" )->Rasterize( data, dw, dh, 0.25, 0.5 );
-		
-		putchar( '\n' );
-		for( unsigned int y=0; y<dh; y++ )
-		  {
-			 for( unsigned int x=0; x<dw; x++ )
-				putchar( data[x + ((dh-y-1)*dw)] ? 'O' : '.' );
-			 putchar( '\n' );
-		  }
-		delete[] data;
-	 }
-#endif
-  
   new Robot( (ModelPosition*)mod,
-				 mod->GetWorld()->GetModel( "source" ),
-				 mod->GetWorld()->GetModel( "sink" ) );
+						 mod->GetWorld()->GetModel( "source" ),
+						 mod->GetWorld()->GetModel( "sink" ) );
   
   return 0; //ok
 }

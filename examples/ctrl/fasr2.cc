@@ -19,18 +19,18 @@ static const unsigned int PAYLOAD = 1;
 
 
 static unsigned int 
-MetersToCell( stg_meters_t m,  stg_meters_t size_m, unsigned int size_c )
+MetersToCell( meters_t m,  meters_t size_m, unsigned int size_c )
 {
   m += size_m / 2.0; // shift to local coords
   m /= size_m / (float)size_c; // scale
   return (unsigned int)floor(m); // quantize 
 }
 
-static stg_meters_t 
-CellToMeters( unsigned int c,  stg_meters_t size_m, unsigned int size_c )
+static meters_t 
+CellToMeters( unsigned int c,  meters_t size_m, unsigned int size_c )
 {
-  stg_meters_t cell_size = size_m/(float)size_c; 
-  stg_meters_t m = c * cell_size; // scale
+  meters_t cell_size = size_m/(float)size_c; 
+  meters_t m = c * cell_size; // scale
   m -= size_m / 2.0; // shift to local coords
 
   return m + cell_size/2.0; // offset to cell center
@@ -115,7 +115,7 @@ private:
 			FOR_EACH( it, nodes ){ (*it)->Draw(); }
 		}
 		
-		bool GoodDirection( const Pose& pose, stg_meters_t range, stg_radians_t& heading_result )
+		bool GoodDirection( const Pose& pose, meters_t range, radians_t& heading_result )
 		{
 			// find the node with the lowest value within range of the given
 			// pose and return the absolute heading from pose to that node 
@@ -143,7 +143,7 @@ private:
 	 
 			if( best_node == NULL )
 				{
-					printf( "FASR warning: no nodes in range" );
+					fprintf( stderr, "FASR warning: no nodes in range" );
 					return false;
 				}
 
@@ -195,8 +195,8 @@ private:
   long int wait_started_at;
   
   ModelPosition* pos;
-  ModelLaser* laser;
-  ModelRanger* ranger;
+  ModelRanger* laser;
+  ModelRanger* sonar;
   ModelFiducial* fiducial;
   
   unsigned int task;
@@ -217,7 +217,7 @@ private:
 		MODE_QUEUE
 	} mode;
 	
-  stg_radians_t docked_angle;
+  radians_t docked_angle;
 
   static pthread_mutex_t planner_mutex;
 
@@ -236,7 +236,7 @@ private:
 	 
   bool fiducial_sub;
   bool laser_sub;
-  bool ranger_sub;
+  bool sonar_sub;
 
   bool force_recharge;
 
@@ -248,8 +248,8 @@ public:
 		: 
 		wait_started_at(-1),
 		pos(pos), 
-		laser( (ModelLaser*)pos->GetUnusedModelOfType( "laser" )),
-		ranger( (ModelRanger*)pos->GetUnusedModelOfType( "ranger" )),
+		laser( (ModelRanger*)pos->GetChild( "ranger:1" )),
+		sonar( (ModelRanger*)pos->GetChild( "ranger:0" )),
 		fiducial( (ModelFiducial*)pos->GetUnusedModelOfType( "fiducial" )),	
 		task(random() % tasks.size() ), // choose a task at random
 		fuel_zone(fuel),
@@ -272,14 +272,14 @@ public:
 		node_interval_countdown( node_interval ),
 		fiducial_sub(false),		
 		laser_sub(false),
-		ranger_sub(false),
+		sonar_sub(false),
 		force_recharge( false )
   {
 		// need at least these models to get any work done
 		// (pos must be good, as we used it in the initialization list)
 		assert( laser );
 		assert( fiducial );
-		assert( ranger );
+		assert( sonar );
 		assert( goal );
 
 		// match the color of my destination
@@ -290,7 +290,7 @@ public:
 		EnableLaser(true);
 
 		// we access all other data from the position callback
-		pos->AddCallback(  Model::CB_UPDATE, (stg_model_callback_t)UpdateCallback, this );
+		pos->AddCallback(  Model::CB_UPDATE, (model_callback_t)UpdateCallback, this );
 		pos->Subscribe();
 
 		pos->AddVisualizer( &graphvis, true );
@@ -350,9 +350,9 @@ public:
 			}
 	}
 	
-  void EnableRanger( bool on )
+  void EnableSonar( bool on )
   { 
-		Enable( ranger, ranger_sub, on );
+		Enable( sonar, sonar_sub, on );
   }
 
   void EnableLaser( bool on )
@@ -368,7 +368,7 @@ public:
 	static std::map< std::pair<uint64_t,uint64_t>, Graph*> plancache;
 	
 
-	uint64_t Pt64( const point_t& pt)
+	uint64_t Pt64( const ast::point_t& pt)
 	{
 		// quantize the position a bit to reduce planning frequency
 		uint64_t x = pt.x / 1;
@@ -377,13 +377,13 @@ public:
 		return (x<<32) + y;
 	}
 	
-	void CachePlan( const point_t& start, const point_t& goal, Graph* graph )
+	void CachePlan( const ast::point_t& start, const ast::point_t& goal, Graph* graph )
 	{
 		std::pair<uint64_t,uint64_t> key( Pt64(start),Pt64(goal));
 		plancache[key] = graph;
 	}
 	
-	Graph* LookupPlan( const point_t& start, const point_t& goal )
+	Graph* LookupPlan( const ast::point_t& start, const ast::point_t& goal )
 	{
 		std::pair<uint64_t,uint64_t> key(Pt64(start),Pt64(goal));
 		return plancache[key];		
@@ -401,9 +401,9 @@ public:
 		Pose pose = pos->GetPose();
 		Geom g = map_model->GetGeom();
 		
-		point_t start( MetersToCell(pose.x, g.size.x, map_width), 
+		ast::point_t start( MetersToCell(pose.x, g.size.x, map_width), 
 									 MetersToCell(pose.y, g.size.y, map_height) );
-		point_t goal( MetersToCell(sp.x, g.size.x, map_width),
+		ast::point_t goal( MetersToCell(sp.x, g.size.x, map_width),
 									MetersToCell(sp.y, g.size.y, map_height) );
 		
 		//printf( "searching from (%.2f, %.2f) [%d, %d]\n", pose.x, pose.y, start.x, start.y );
@@ -427,14 +427,14 @@ public:
 		if( ! graphp ) // no plan cached
 			{
 				misses++;
-
-				std::vector<point_t> path;
-				bool result = astar( map_data, 
-														 map_width, 
-														 map_height, 
-														 start,
-														 goal,
-														 path );				
+				
+				std::vector<ast::point_t> path;
+				bool result = ast::astar( map_data, 
+																		map_width, 
+																		map_height, 
+																		start,
+																		goal,
+																		path );				
 				
 				//	if( ! result )
 				//printf( "FASR warning: plan failed to find path from (%.2f,%.2f) to (%.2f,%.2f)\n",
@@ -447,7 +447,7 @@ public:
 				
 				Node* last_node = NULL;
 
-				for( std::vector<point_t>::const_reverse_iterator rit = path.rbegin();
+				for( std::vector<ast::point_t>::const_reverse_iterator rit = path.rbegin();
 						 rit != path.rend();
 						 ++rit )			
 					{	
@@ -481,7 +481,7 @@ public:
 		
   void Dock()
   {
-		const stg_meters_t creep_distance = 0.5;
+		const meters_t creep_distance = 0.5;
 	 
 		if( charger_ahoy )
 			{
@@ -527,7 +527,7 @@ public:
 			{
 				//printf( "fully charged, now back to work\n" );		  
 				mode = MODE_UNDOCK;
-				EnableRanger(true); // enable the sonar to see behind us
+				EnableSonar(true); // enable the sonar to see behind us
 				EnableLaser(true);
 				EnableFiducial(true);
 				force_recharge = false;		  
@@ -542,15 +542,15 @@ public:
 
   void UnDock()
   {
-		const stg_meters_t back_off_distance = 0.2;
-		const stg_meters_t back_off_speed = -0.02;
-		const stg_radians_t undock_rotate_speed = 0.3;
-		const stg_meters_t wait_distance = 0.2;
+		const meters_t back_off_distance = 0.2;
+		const meters_t back_off_speed = -0.02;
+		const radians_t undock_rotate_speed = 0.3;
+		const meters_t wait_distance = 0.2;
 		const unsigned int BACK_SENSOR_FIRST = 10;
 		const unsigned int BACK_SENSOR_LAST = 13;
 	 
 		// make sure the required sensors are running
-		assert( ranger_sub );
+		assert( sonar_sub );
 		assert( fiducial_sub );
 
 		if( charger_range < back_off_distance )
@@ -560,10 +560,10 @@ public:
 				pos->Say( "" );
 		  
 				// stay put while anything is close behind 
-				const std::vector<ModelRanger::Sensor>& sensors = ranger->GetSensors();
+				const std::vector<ModelRanger::Sensor>& sensors = sonar->GetSensors();
 
 				for( unsigned int s = BACK_SENSOR_FIRST; s <= BACK_SENSOR_LAST; ++s )
-					if( sensors[s].range < wait_distance) 
+					if( sensors[s].ranges[0] < wait_distance) 
 						{
 							pos->Say( "Waiting..." );
 							pos->SetXSpeed( 0.0 );
@@ -598,7 +598,7 @@ public:
 
 				
 						EnableFiducial(false);
-						EnableRanger(false);
+						EnableSonar(false);
 					}
 			}
   }
@@ -614,31 +614,35 @@ public:
 		double minright = 1e6;
   
 		// Get the data
-		const std::vector<ModelLaser::Sample>& scan = laser->GetSamples();
+		//const std::vector<ModelLaser::Sample>& scan = laser->GetSamples();
+
+		const std::vector<meters_t>& scan = laser->GetRanges();
+
     uint32_t sample_count = scan.size();
+
 
 		for (uint32_t i = 0; i < sample_count; i++)
 			{		
-				if( verbose ) printf( "%.3f ", scan[i].range );
+				if( verbose ) printf( "%.3f ", scan[i] );
 		
 				if( (i > (sample_count/4)) 
 						&& (i < (sample_count - (sample_count/4))) 
-						&& scan[i].range < minfrontdistance)
+						&& scan[i] < minfrontdistance)
 					{
 						if( verbose ) puts( "  obstruction!" );
 						obstruction = true;
 					}
 		
-				if( scan[i].range < stopdist )
+				if( scan[i] < stopdist )
 					{
 						if( verbose ) puts( "  stopping!" );
 						stop = true;
 					}
 		
 				if( i > sample_count/2 )
-					minleft = std::min( minleft, scan[i].range );
+					minleft = std::min( minleft, scan[i] );
 				else      
-					minright = std::min( minright, scan[i].range );
+					minright = std::min( minright, scan[i] );
 			}
   
 		if( verbose ) 
@@ -754,7 +758,7 @@ public:
   }	 
   
   // static callback wrapper
-  static int UpdateCallback( ModelLaser* laser, Robot* robot )
+  static int UpdateCallback( ModelRanger* laser, Robot* robot )
   {  
 		return robot->Update();
   }
@@ -772,12 +776,12 @@ public:
 						seconds = timenow;
 				
 						// report the task participation		  
-						printf( "time: %d sec\n", seconds ); 
+						//						printf( "time: %d sec\n", seconds ); 
 						  
-						unsigned int sz = tasks.size(); 
-						for( unsigned int i=0; i<sz; ++i )
-							printf( "\t task[%u] %3u (%s)\n", 
-											i, tasks[i].participants, tasks[i].source->Token() );			 				
+// 						unsigned int sz = tasks.size(); 
+// 						for( unsigned int i=0; i<sz; ++i )
+// 							printf( "\t task[%u] %3u (%s)\n", 
+// 											i, tasks[i].participants, tasks[i].source->Token() );			 				
 					}
 			}
 	 
@@ -834,7 +838,7 @@ public:
 				Pose sourcepose = goal->GetPose();
 				Geom sourcegeom = goal->GetGeom();
 		  
-				stg_meters_t dest_dist = hypot( sourcepose.x-pose.x, sourcepose.y-pose.y );
+				meters_t dest_dist = hypot( sourcepose.x-pose.x, sourcepose.y-pose.y );
 		  
 				// when we get close enough, we start waiting
 				if( dest_dist < sourcegeom.size.x/2.0 ) // nearby
@@ -966,8 +970,8 @@ void Robot::Node::Draw() const
 
 // STATIC VARS
 pthread_mutex_t Robot::planner_mutex = PTHREAD_MUTEX_INITIALIZER;
-const unsigned int Robot::map_width( 50 );
-const unsigned int Robot::map_height( 50 );
+const unsigned int Robot::map_width( 32 );
+const unsigned int Robot::map_height( 32 );
 uint8_t* Robot::map_data( NULL );
 Model* Robot::map_model( NULL );
 

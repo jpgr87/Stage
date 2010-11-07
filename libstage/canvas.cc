@@ -252,34 +252,30 @@ Model* Canvas::getModel( int x, int y )
 		  }
     }
 	
+  glFlush(); // make sure the drawing is done
+
   // read the color of the pixel in the back buffer under the mouse
   // pointer
   GLint viewport[4];
   glGetIntegerv(GL_VIEWPORT,viewport);
 
-  uint8_t rByte, gByte, bByte, aByte;
+  uint8_t rgbaByte[4];
   uint32_t modelId;
 	
   glReadPixels( x,viewport[3]-y,1,1,
-					 GL_RED,GL_UNSIGNED_BYTE,(void*)&rByte );
-  glReadPixels( x,viewport[3]-y,1,1,
-					 GL_GREEN,GL_UNSIGNED_BYTE,(void*)&gByte );
-  glReadPixels( x,viewport[3]-y,1,1,
-					 GL_BLUE,GL_UNSIGNED_BYTE,(void*)&bByte );
-  glReadPixels( x,viewport[3]-y,1,1,
-					 GL_ALPHA,GL_UNSIGNED_BYTE,(void*)&aByte );
+					 GL_RGBA,GL_UNSIGNED_BYTE,&rgbaByte[0] );
 	
-  modelId = rByte;
-  modelId |= gByte << 8;
-  modelId |= bByte << 16;
-  //modelId |= aByte << 24;
+  modelId = rgbaByte[0];
+  modelId |= rgbaByte[1] << 8;
+  modelId |= rgbaByte[2] << 16;
+  //modelId |= rgbaByte[3] << 24;
 	
-  //	printf("Clicked rByte: 0x%X, gByte: 0x%X, bByte: 0x%X, aByte: 0x%X\n", rByte, gByte, bByte, aByte);
+  //	printf("Clicked rByte: 0x%X, gByte: 0x%X, bByte: 0x%X, aByte: 0x%X\n", rgbaByte[0], rgbaByte[1], rgbaByte[2], rgbaByte[3]);
   //	printf("-->model Id = 0x%X\n", modelId);
 	
   Model* mod = Model::LookupId( modelId );
 
-  //printf("%p %s %d %x\n", mod, mod ? mod->Token() : "(none)", id, id );
+  //printf("%p %s %d %x\n", mod, mod ? mod->Token() : "(none)", modelId, modelId );
 
   // put things back the way we found them
   glEnable(GL_DITHER);
@@ -594,7 +590,7 @@ void Canvas::RemoveModel( Model*  mod  )
 void Canvas::DrawGlobalGrid()
 {
 
-  stg_bounds3d_t bounds = world->GetExtent();
+  bounds3d_t bounds = world->GetExtent();
 
   /*   printf( "bounds [%.2f %.2f] [%.2f %.2f] [%.2f %.2f]\n",
        bounds.x.min, bounds.x.max,
@@ -671,7 +667,7 @@ void Canvas::DrawGlobalGrid()
 //draw the floor without any grid ( for robot's perspective camera model )
 void Canvas::DrawFloor()
 {
-  stg_bounds3d_t bounds = world->GetExtent();
+  bounds3d_t bounds = world->GetExtent();
 	
   glEnable(GL_POLYGON_OFFSET_FILL);
   glPolygonOffset(2.0, 2.0);
@@ -684,8 +680,6 @@ void Canvas::DrawFloor()
   glVertex2f( bounds.x.max, bounds.y.max );
   glVertex2f( bounds.x.min, bounds.y.max );
   glEnd();
-	
-  //glEnd();
 }
 
 void Canvas::DrawBlocks() 
@@ -744,8 +738,8 @@ void Canvas::resetCamera()
 
 class DistFuncObj
 {
-  stg_meters_t x, y;
-  DistFuncObj( stg_meters_t x, stg_meters_t y ) 
+  meters_t x, y;
+  DistFuncObj( meters_t x, meters_t y ) 
     : x(x), y(y) {}
   
   bool operator()(const Model* a, const Model* b ) const
@@ -753,10 +747,10 @@ class DistFuncObj
     Pose a_pose = a->GetGlobalPose();
     Pose b_pose = b->GetGlobalPose();
 	 
-    stg_meters_t a_dist = hypot( y - a_pose.y,
+    meters_t a_dist = hypot( y - a_pose.y,
 											x - a_pose.x );
 	 
-    stg_meters_t b_dist = hypot( y - b_pose.y,
+    meters_t b_dist = hypot( y - b_pose.y,
 											x - b_pose.x );
 	 
     return (  a_dist < b_dist );
@@ -1264,7 +1258,7 @@ void Canvas::draw()
 		  } 
       else 
 		  {
-			 stg_bounds3d_t extent = world->GetExtent();
+			 bounds3d_t extent = world->GetExtent();
 			 camera.SetProjection( w(), h(), extent.y.min, extent.y.max );
 			 current_camera = &camera;
 		  }

@@ -20,10 +20,10 @@ using namespace Stg;
 
 // DEFAULT PARAMETERS FOR LASER MODEL
 static const bool DEFAULT_FILLED = true;
-static const stg_watts_t DEFAULT_WATTS = 17.5;
+static const watts_t DEFAULT_WATTS = 17.5;
 static const Size DEFAULT_SIZE( 0.15, 0.15, 0.2 );
-static const stg_meters_t DEFAULT_MAXRANGE = 8.0;
-static const stg_radians_t DEFAULT_FOV = M_PI;
+static const meters_t DEFAULT_MAXRANGE = 8.0;
+static const radians_t DEFAULT_FOV = M_PI;
 static const unsigned int DEFAULT_SAMPLES = 180;
 static const unsigned int DEFAULT_RESOLUTION = 1;
 static const char* DEFAULT_COLOR = "blue";
@@ -284,9 +284,8 @@ void ModelLaser::Vis::Visualize( Model* mod, Camera* cam )
 
   ModelLaser* laser( dynamic_cast<ModelLaser*>(mod) );
 	
-  const std::vector<Sample>& samples( laser->GetSamples() );
-    
-  size_t sample_count( samples.size() );
+  const std::vector<Sample>& samples( laser->GetSamples() );    
+  const size_t sample_count( samples.size() );
 
   glPushMatrix();
   glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
@@ -313,6 +312,7 @@ void ModelLaser::Vis::Visualize( Model* mod, Camera* cam )
 			// if the sample is unusually bright, draw a little blob
 			if( samples[s].reflectance > 0 )
 				{
+					// this happens rarely so we can do it in immediate mode
 					glBegin( GL_POINTS );
 					glVertex2f( pts[2*s+2], pts[2*s+3] );
 					glEnd();

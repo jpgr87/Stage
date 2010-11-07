@@ -61,16 +61,21 @@ int  InterfaceMap::HandleMsgReqInfo( QueuePointer & resp_queue,
 
   
   // create and render a map for this model
+<<<<<<< HEAD
   Stg::Geom geom;
   geom = this->mod->GetGeom();
+=======
+  Geom geom;
+  model_get_geom( this->mod, &geom );
+>>>>>>> upstream
   
   
   double mres = this->mod->GetMapResolution();
 
   // size_t sz=0;
-//   stg_polygon_t* polys = (stg_polygon_t*)
-//     stg_model_get_property( this->mod, "polygons", &sz);
-//   size_t count = sz / sizeof(stg_polygon_t);
+//   polygon_t* polys = (polygon_t*)
+//     model_get_property( this->mod, "polygons", &sz);
+//   size_t count = sz / sizeof(polygon_t);
   
   
   // prepare the map info for the client
@@ -85,6 +90,10 @@ int  InterfaceMap::HandleMsgReqInfo( QueuePointer & resp_queue,
   // origin of map center in global coords
   Stg::Pose global;
   memcpy( &global, &geom.pose, sizeof(global)); 
+<<<<<<< HEAD
+=======
+  model_local_to_global( this->mod, &global );
+>>>>>>> upstream
  
   global =  this->mod->LocalToGlobal( &geom.pose );
 
@@ -154,8 +163,13 @@ int InterfaceMap::HandleMsgReqData( QueuePointer & resp_queue,
 {
   // printf( "device %s received map data request\n", this->mod->token );
   
+<<<<<<< HEAD
   Stg::Geom geom;
   geom = this->mod->GetGeom( );
+=======
+  Geom geom;
+  model_get_geom( this->mod, &geom );
+>>>>>>> upstream
   
   double mres = this->mod->GetMapResolution();
   
@@ -183,18 +197,18 @@ int InterfaceMap::HandleMsgReqData( QueuePointer & resp_queue,
   // render the polygons directly into the outgoing message buffer. fast! outrageous!
   
   GList* plist;
-  for( plist = stg_model_get_polygons( mod ); 
+  for( plist = model_get_polygons( mod ); 
        plist; 
        plist = plist->next )
     {       
-      stg_polygon_t* p = (stg_polygon_t*)plist->data;
+      polygon_t* p = (polygon_t*)plist->data;
 
       // draw each line in the poly
       int line_count = (int)p->points->len;
       for( int l=0; l<line_count; l++ )
 	{
-	  stg_point_t* pt1 = &g_array_index( p->points, stg_point_t, l ); 
-	  stg_point_t* pt2 = &g_array_index( p->points, stg_point_t, (l+1) % line_count );	   
+	  point_t* pt1 = &g_array_index( p->points, point_t, l ); 
+	  point_t* pt2 = &g_array_index( p->points, point_t, (l+1) % line_count );	   
 	  
 	  render_line( mapresp->data, 
 		       mapresp->width, mapresp->height,
@@ -210,8 +224,8 @@ int InterfaceMap::HandleMsgReqData( QueuePointer & resp_queue,
 
   // TODO: need to think about this a little. not vital for now....
 
-//   stg_bool_t* boundary = (stg_bool_t*)
-//     stg_model_get_property_fixed( mod, "boundary", sizeof(stg_bool_t));
+//   bool_t* boundary = (bool_t*)
+//     model_get_property_fixed( mod, "boundary", sizeof(bool_t));
   
 //   if( boundary && *boundary )
 //     {      
