@@ -383,9 +383,9 @@ StgDriver::StgDriver(ConfigFile* cf, int section)
 // 	  ifsrc = new InterfaceLocalize( player_addr,  this, cf, section );
 // 	  break;
 
-// 	case PLAYER_MAP_CODE:
-// 	  ifsrc = new InterfaceMap( player_addr,  this, cf, section );
-// 	  break;
+ 	case PLAYER_MAP_CODE:
+ 	  ifsrc = new InterfaceMap( player_addr,  this, cf, section );
+ 	  break;
 
 	case PLAYER_GRIPPER_CODE:
 	  ifsrc = new InterfaceGripper( player_addr,  this, cf, section );

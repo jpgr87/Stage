@@ -12,6 +12,7 @@ set( stagepluginSrcs
 		   p_gripper.cc
 	     p_simulation.cc
 	     p_laser.cc
+#	     p_map.cc
 	     p_fiducial.cc
 	     p_position.cc
 	     p_power.cc

@@ -2318,6 +2318,9 @@ namespace Stg
 	 /** Get (a copy of) the model's geometry - it's size and local
 		  pose (offset from origin in local coords). */
 	 Geom GetGeom() const { return geom; }
+
+	 /** Get the Map Resolution */
+	 stg_meters_t GetMapResolution() { return map_resolution;}
 	
 	 /** Get (a copy of) the pose of a model in its parent's coordinate
 		  system.  */
