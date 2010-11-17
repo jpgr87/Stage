@@ -709,6 +709,8 @@ namespace Stg
     virtual Pose GetGlobalPose();
 	 
     const char* Token(){ return token.c_str(); }
+
+    const std::string& TokenStr(){ return token; }
 	 
     void SetToken( const std::string& str ){ token = str; } 
 	 
@@ -2751,7 +2753,7 @@ namespace Stg
 		meters_t range; ///< range to the target
 		radians_t bearing; ///< bearing to the target 
 		Pose geom; ///< size and relative angle of the target
-		 Pose pose_rel; /// relative pose of the target in local coordinates		 
+		 //Pose pose_rel; /// relative pose of the target in local coordinates		 
 		Pose pose; ///< Absolute accurate position of the target in world coordinates (it's cheating to use this in robot controllers!)
 		Model* mod; ///< Pointer to the model (real fiducial detectors can't do this!)
 		int id; ///< the fiducial identifier of the target (i.e. its fiducial_return value), or -1 if none can be detected.  
@@ -2837,7 +2839,7 @@ namespace Stg
 			Color col;
 			
 			std::vector<meters_t> ranges;
-			std::vector<float> intensities;
+			std::vector<float_t> intensities;
 			
 			Sensor() : pose( 0,0,0,0 ), 
 								 size( 0.02, 0.02, 0.02 ), // teeny transducer
