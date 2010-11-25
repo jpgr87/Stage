@@ -44,23 +44,24 @@ set( stageSrcs
   ancestor.cc
 )
 
-#	model_laser.cc
-
-
 set_source_files_properties( ${stageSrcs} PROPERTIES COMPILE_FLAGS "${FLTK_CFLAGS}" )
  
 add_library(stage SHARED ${stageSrcs})
 
-target_link_libraries( stage  
-           ${LTDL_LIB}
-			  ${OPENGL_LIBRARIES}  # seems to be needed on some platforms
-)
+# if fltk-config didn't bring along the OpenGL dependencies (eg. on
+# Debian/Ubuntu), add them explicity 
+IF (NOT(${FLTK_LDFLAGS} MATCHES "-lGL"))
+  target_link_libraries( stage ${OPENGL_LIBRARIES}) 
+ENDIF (NOT(${FLTK_LDFLAGS} MATCHES "-lGL"))
+
 
 # causes the shared library to have a version number
 set_target_properties( stage PROPERTIES
 		       VERSION ${VERSION}
            LINK_FLAGS "${FLTK_LDFLAGS}"	  
 )
+
+target_link_libraries( stage ${LTDL_LIB} )
 
 set( stagebinarySrcs main.cc )
 set_source_files_properties( ${stagebinarySrcs} PROPERTIES COMPILE_FLAGS "${FLTK_CFLAGS}" )
@@ -77,17 +78,19 @@ set_source_files_properties( ${stagebinarySrcs} PROPERTIES COMPILE_FLAGS "${FLTK
 
 add_executable( stagebinary ${stagebinarySrcs} )
 
+
+set_target_properties( stagebinary PROPERTIES OUTPUT_NAME stage )
+
 # Apple seems to have trouble when libstage and stagebinary are linked against FLTK
 # Newer Linux distributions won't allow stagebinary to inherit libstage's links to fltk, so we need
 # to explicitly link on Linux
 
-if (NOT PROJECT_OS_LINUX)
-  set_target_properties( stagebinary PROPERTIES OUTPUT_NAME stage )
-  target_link_libraries( stagebinary stage )
-ELSE (NOT PROJECT_OS_LINUX)
-  set_target_properties( stagebinary PROPERTIES OUTPUT_NAME stage LINK_FLAGS "${FLTK_LDFLAGS}" )
+target_link_libraries( stagebinary stage )
+set_target_properties( stagebinary PROPERTIES LINK_FLAGS "${FLTK_LDFLAGS}" )
+
+IF(PROJECT_OS_LINUX)
   target_link_libraries( stagebinary stage pthread )
-ENDIF(NOT PROJECT_OS_LINUX)
+ENDIF(PROJECT_OS_LINUX)
 
 INSTALL(TARGETS stagebinary stage
 	RUNTIME DESTINATION bin

@@ -106,7 +106,7 @@ driver
 driver
 (
   name "stage"
-  provides ["position2d:0" "laser:0"]
+  provides ["position2d:0" "ranger:0"]
   model "marvin"
 )
 
@@ -348,8 +348,9 @@ StgDriver::StgDriver(ConfigFile* cf, int section)
 		ifsrc = new InterfaceFiducial( player_addr,  this, cf, section );
 		break;
 
-	case PLAYER_SONAR_CODE: // drop through as we use the same interface
-	case PLAYER_LASER_CODE:
+		//case PLAYER_SONAR_CODE: // drop through as we use the same interface
+		//case PLAYER_LASER_CODE:
+	case PLAYER_RANGER_CODE:
 		ifsrc = new InterfaceRanger( player_addr,  this, cf, section );
 		break;
 

@@ -1989,6 +1989,9 @@ namespace Stg
 		  it doesn't exist in this model. */
     Model* GetChild( const std::string& name ) const;
 
+		/** return the update interval in usec */
+		usec_t GetInterval(){ return interval; }
+		
 	 class Visibility
 	 {
 	 public:
@@ -2824,7 +2827,7 @@ namespace Stg
 			static Option showTransducers;		
 			
 			Vis( World* world );		
-			virtual ~Vis( void ){}
+		  virtual ~Vis( void ){} 
 			virtual void Visualize( Model* mod, Camera* cam );
 		} vis;
 		
@@ -2839,7 +2842,7 @@ namespace Stg
 			Color col;
 			
 			std::vector<meters_t> ranges;
-			std::vector<float_t> intensities;
+			std::vector<double> intensities;
 			
 			Sensor() : pose( 0,0,0,0 ), 
 								 size( 0.02, 0.02, 0.02 ), // teeny transducer
@@ -2855,32 +2858,50 @@ namespace Stg
 			void Load( Worldfile* wf, int entity );
 		};
 
-		/** returns a const reference to a vector of range and reflectance samples */
-			const std::vector<Sensor>& GetSensors() const
-		{ return sensors; }
+	 /** returns a const reference to a vector of range and reflectance samples */
+	 const std::vector<Sensor>& GetSensors() const
+	 { return sensors; }
+	 
+	 /** returns a vector of range samples from the indicated sensor
+		  (defaults to zero) */
+	 const std::vector<meters_t>& GetRanges( unsigned int sensor=0) const 
+	 { 
+		if( sensor < sensors.size() )
+		  return sensors[sensor].ranges;
 		
-		/** returns a vector of range samples from the indicated sensor
-				(defaults to zero) */
-		const std::vector<meters_t>& GetRanges( unsigned int sensor=0) const 
-		{ 
-			if( sensor < sensors.size() )
-				return sensors[sensor].ranges;
-			
-			PRINT_ERR1( "invalid sensor index specified (%d)", sensor );
-			exit(-1);
+		PRINT_ERR1( "invalid sensor index specified (%d)", sensor );
+		exit(-1);
+	 }
+		
+		/** returns a pointer to an array of ranges, and fills in the
+				argument with the array-length (C-style). */
+		meters_t* GetRangesArr( unsigned int sensor, uint32_t* count )
+		{
+			assert(count);
+			*count = sensors[sensor].ranges.size();
+			return &sensors[sensor].ranges[0];
+		}
+
+		/** returns a pointer to an array of intensities, and fills in the
+				argument with the array-length (C-style). */
+		meters_t* GetIntensitiesArr( unsigned int sensor, uint32_t* count )
+		{
+			assert(count);
+			*count = sensors[sensor].intensities.size();
+			return &sensors[sensor].intensities[0];
 		}
 		
-		/** returns a vector of intensitye samples from the indicated sensor
-				(defaults to zero) */
-		const std::vector<float_t>& GetIntensities( unsigned int sensor=0) const 
-		{ 
-			if( sensor < sensors.size() )
-				return sensors[sensor].intensities;
-			
-			PRINT_ERR1( "invalid sensor index specified (%d)", sensor );
-			exit(-1);
-		}
+	 /** returns a vector of intensitye samples from the indicated sensor
+		  (defaults to zero) */
+	 const std::vector<double>& GetIntensities( unsigned int sensor=0) const 
+	 { 
+		if( sensor < sensors.size() )
+		  return sensors[sensor].intensities;
 		
+		PRINT_ERR1( "invalid sensor index specified (%d)", sensor );
+		exit(-1);
+	 }
+	 
 		void LoadSensor( Worldfile* wf, int entity );
 		
   private:
