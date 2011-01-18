@@ -11,8 +11,6 @@ namespace Stg
 {
 
   // a bit of experimenting suggests that these values are fast. YMMV.
-  //const int32_t RBITS( 5 ); // regions contain (2^RBITS)^2 pixels
-  //const int32_t SBITS( 5 );// superregions contain (2^SBITS)^2 regions
   const int32_t RBITS( 5 ); // regions contain (2^RBITS)^2 pixels
   const int32_t SBITS( 5 );// superregions contain (2^SBITS)^2 regions
   const int32_t SRBITS( RBITS+SBITS );
@@ -32,69 +30,103 @@ namespace Stg
 
   // this is slightly faster than the inline method above, but not as safe
   //#define GETREG(X) (( (static_cast<int32_t>(X)) & REGIONMASK ) >> RBITS)
-
+	
   class Cell 
   {
-	 friend class Region;
-	 friend class SuperRegion;
-	 friend class World;
-	 friend class Block;
+		friend class SuperRegion;
+		friend class World;
 	 
   private:
-	 Region* region;  
-	 std::vector<Block*> blocks;		
+	 std::vector<Block*> blocks[2];		
 	 
   public:
-	 Cell( Region* reg ) 
-		: region( reg ),
-		  blocks() 
-	 { /* nothing to do */ }  		
+	 Cell() 
+		: blocks(), 
+		  region(NULL)
+	 { /* nothing to do */ }  				
+	 
+	 void RemoveBlock( Block* b, unsigned int index );
+	 void AddBlock( Block* b, unsigned int index );
+	 
+	 const std::vector<Block*>& GetBlocks( unsigned int index ){ return blocks[index]; }
+	 
+	 Region* region;  
   };  // class Cell
   
   class Region
   {
-  public:
-	 std::vector<Cell> cells;
-	 
-	 SuperRegion* superregion;	
-	 unsigned long count; // number of blocks rendered into this region
-  
-	 Region( SuperRegion* sr );
-	 ~Region();
-	 
-	 Cell* GetCell( int32_t x, int32_t y )
-	 {
-		if( cells.empty() ) // lazy population of cells
-		  cells.insert( cells.begin(), REGIONSIZE, Cell( this ) );			 
-		
-		return( (Cell*)&cells[ x + y * REGIONWIDTH ] ); 
-	 }	 
-
-  }; // class Region
-
-  class SuperRegion
-  {
-	 friend class World;
-	 friend class Model;	 
+	 friend class SuperRegion;
+	 friend class World; // for raytracing
 	 
   private:
+	 Cell* cells;
+	 unsigned long count; // number of blocks rendered into this region
 	 
-	 std::vector<Region> regions;
-	 point_int_t origin;
-	 World* world;
+	 // vector of garbage collected cell arrays to reallocate before
+	 // using new in GetCell()
+	 static std::vector<Cell*> dead_pool;
 	 
   public:
+	 Region();
+	 ~Region();
 	 
+	 inline Cell* GetCell( int32_t x, int32_t y )
+	 {	
+		if( cells == NULL )
+		  {
+			 assert(count == 0 );
+			 
+			 if( dead_pool.size() )
+				{
+				  cells = dead_pool.back();
+				  dead_pool.pop_back();
+				  //printf( "reusing cells @ %p (pool %u)\n", cells, dead_pool.size() );
+				}
+			 else
+				cells = new Cell[REGIONSIZE];
+		  	 
+			 for( int32_t c=0; c<REGIONSIZE;++c)
+				cells[c].region = this;
+		  } 
+		return( &cells[ x + y * REGIONWIDTH ] );
+	 }
+	 	 
+	 inline void AddBlock();
+	 inline void RemoveBlock(); 
+	 
+	 SuperRegion* superregion;	
+	 
+  }; // class Region
+  
+  class SuperRegion
+  {
+  private:
+	 unsigned long count; // number of blocks rendered into this superregion
+	 pthread_rwlock_t rwlock;
+	 point_int_t origin;
+	 Region regions[SUPERREGIONSIZE];
+	 World* world;
+	 
+  public:	 
 	 SuperRegion( World* world, point_int_t origin );
 	 ~SuperRegion();
 	 
-	 Region* GetRegion( int32_t x, int32_t y )
-	 { return( &regions[ x + y * SUPERREGIONWIDTH ] ); }
+	 inline Region* GetRegion( int32_t x, int32_t y )
+	 { 
+		return( &regions[ x + y * SUPERREGIONWIDTH ]);
+	 }
 	 
-	 void DrawOccupancy();
-	 void DrawVoxels();
+	 void DrawOccupancy(unsigned int layer) const;
+	 void DrawVoxels(unsigned int layer) const;
 	 
-	 unsigned long count; // number of blocks rendered into this superregion
+	 inline void ReadLock(){ pthread_rwlock_rdlock( &rwlock); }
+	 inline void WriteLock(){ pthread_rwlock_wrlock( &rwlock); }
+	 inline void Unlock(){ pthread_rwlock_unlock( &rwlock); }
+	 
+	 inline void AddBlock();
+	 inline void RemoveBlock();		
+	 
+	 const point_int_t& GetOrigin() const { return origin; }
   }; // class SuperRegion;
   
-}; // namespace Stg
+  }; // namespace Stg

@@ -11,21 +11,20 @@ static void canonicalize_winding(vector<point_t>& pts);
     blocks. The point data is copied, so pts can safely be freed
     after calling this.*/
 Block::Block( Model* mod,
-							const std::vector<point_t>& pts,
-							meters_t zmin,
-							meters_t zmax,
-							Color color,
-							bool inherit_color,
-							bool wheel ) :
+				  const std::vector<point_t>& pts,
+				  meters_t zmin,
+				  meters_t zmax,
+				  Color color,
+				  bool inherit_color,
+				  bool wheel ) :
   mod( mod ),
   mpts(),
   pts(pts),
   local_z( zmin, zmax ),
   color( color ),
   inherit_color( inherit_color ),
-	wheel(wheel),
-  rendered_cells( new CellPtrVec ), 
-  candidate_cells( new CellPtrVec ),
+  wheel(wheel),
+  rendered_cells(), 
   gpts()
 {
   assert( mod );
@@ -39,10 +38,12 @@ Block::Block(  Model* mod,
   : mod( mod ),
     mpts(),
     pts(),
+	 local_z(),
     color(),
     inherit_color(true),
-    rendered_cells( new CellPtrVec ), 
-    candidate_cells( new CellPtrVec ) 
+	 wheel(),
+    rendered_cells(),
+	 gpts()
 {
   assert(mod);
   assert(wf);
@@ -54,10 +55,11 @@ Block::Block(  Model* mod,
 
 Block::~Block()
 {
-  if( mapped ) UnMap();
-  
-  delete rendered_cells;
-  delete candidate_cells;
+  if( mapped )
+	 {
+		UnMap(0);
+		UnMap(1);
+	 }
 }
 
 void Block::Translate( double x, double y )
@@ -138,10 +140,12 @@ const Color& Block::GetColor()
 
 void Block::AppendTouchingModels( ModelPtrSet& touchers )
 {
+  unsigned int layer = mod->world->updates % 2;
+  
   // for every cell we are rendered into
-  FOR_EACH( cell_it, *rendered_cells )
+  FOR_EACH( cell_it, rendered_cells[layer] )
 	 // for every block rendered into that cell
-	 FOR_EACH( block_it, (*cell_it)->blocks )
+	 FOR_EACH( block_it, (*cell_it)->GetBlocks(layer) )
 	 {
 		if( !mod->IsRelated( (*block_it)->mod ))
 		  touchers.insert( (*block_it)->mod );
@@ -153,18 +157,20 @@ Model* Block::TestCollision()
   //printf( "model %s block %p test collision...\n", mod->Token(), this );
 
   // find the set of cells we would render into given the current global pose
-  GenerateCandidateCells();
+  //GenerateCandidateCells();
   
   if( mod->vis.obstacle_return )
   {
     if ( global_z.min < 0 )
-      return this->mod->world->GetGround();
+      return mod->world->GetGround();
 	  
+	 unsigned int layer = mod->world->updates % 2;
+
     // for every cell we may be rendered into
-	 FOR_EACH( cell_it, *candidate_cells )
+	 FOR_EACH( cell_it, rendered_cells[layer] )
       {
 		  // for every block rendered into that cell
-		  FOR_EACH( block_it, (*cell_it)->blocks )
+				FOR_EACH( block_it, (*cell_it)->GetBlocks(layer) )
 			 {
 				Block* testblock = *block_it;
 				Model* testmod = testblock->mod;
@@ -190,106 +196,52 @@ Model* Block::TestCollision()
   return NULL; // no hit
 }
 
-void Block::Map()
+void Block::Map( unsigned int layer )
 {
-  // TODO - if called often, we may not need to generate each time
-  GenerateCandidateCells();
-  SwitchToTestedCells();
-  mapped = true;
+	// calculate the local coords of the block vertices
+	const size_t pt_count(pts.size());
+	
+  if( mpts.size() == 0 )
+		{
+			// no valid cache of model coord points, so generate them
+			mpts.resize( pts.size() );
+			
+			for( size_t i=0; i<pt_count; ++i )
+				mpts[i] = BlockPointToModelMeters( pts[i] );
+		}
+  
+	// now calculate the global pixel coords of the block vertices
+  gpts.clear();
+  mod->LocalToPixels( mpts, gpts );
+	
+	// and render this block's polygon into the world
+	mod->world->MapPoly( gpts, this, layer );
+	
+  // update the block's absolute z bounds at this rendering
+  Pose gpose( mod->GetGlobalPose() );
+  gpose.z += mod->geom.pose.z;
+  double scalez( mod->geom.size.z /  mod->blockgroup.GetSize().z );
+  meters_t z = gpose.z - mod->blockgroup.GetOffset().z;  
+  global_z.min = (scalez * local_z.min) + z;
+  global_z.max = (scalez * local_z.max) + z;
+  
+  mapped = true;	
 }
 
-void Block::UnMap()
+#include <algorithm>
+#include <functional>
+
+void Block::UnMap( unsigned int layer )
 {
-  RemoveFromCellArray( rendered_cells );
-  rendered_cells->clear();
+	//   std::for_each( rendered_cells.begin(), 
+	// 					  rendered_cells.end(), 
+	// 					  std::bind2nd( std::mem_fun(&Cell::RemoveBlock), this));
+  
+  FOR_EACH( it, rendered_cells[layer] )
+		(*it)->RemoveBlock(this, layer );
+  
+  rendered_cells[layer].clear();
   mapped = false;
-}
-
-inline void Block::RemoveFromCellArray( CellPtrVec *cells )
-{
-  FOR_EACH( it, *cells )
-	 {
-		Cell* cell = *it;
-
- 		size_t len = cell->blocks.size();
-		if( len )
-			{
-#if 0		// Use conventional STL style		
-
-				// this special-case test is faster for worlds with simple models,
-				// which are the ones we want to be really fast. It's a small
-				// extra cost for worlds with several models in each cell. It
-				// gives a 5% overall speed increase in fasr.world.
-				
-				if( (cell->blocks.size() == 1) &&
-						(cell->blocks[0] == this) ) // special but common case
-					{
-						cell->blocks.clear(); // cheap
-					}
-				else // the general but relatively expensive case
-					{
-						EraseAll( this, cell->blocks );		
-					}
-#else		// attempt faster removal loop
-				// O(n) * low constant array element removal
-				// this C-style pointer work looks to be very slightly faster than the STL way
-				Block **start = &cell->blocks[0]; // start of array
-				Block **r     = &cell->blocks[0]; // read from here
-				Block **w     = &cell->blocks[0]; // write to here
-				
-				while( r < start + len ) // scan down array, skipping 'this' 
-					{
-						if( *r != this ) 
-							*w++ = *r;				
-						r++;
-					}
-				cell->blocks.resize( w-start );
-#endif
-			}
-		
-		--cell->region->count;
-		--cell->region->superregion->count;  	 	 
-	 }
-
-  //printf( "%d %d %.2f\n", count1, countmore, ((float)count1)/float(countmore));
-}
-
-void Block::SwitchToTestedCells()
-{
-  // todo: 
-
-  // 1. find the set of cells in rendered but not candidate and remove
-  // them
-
-  // 2. find the set of cells in candidate but not rendered and insert
-  // them
-
-  // .. and see if that is faster than the current method
-
-	//printf( "rendered_cells %lu\n", rendered_cells->size() );
-	//printf( "candidate_cells %lu\n\n", candidate_cells->size() );	
-
-  RemoveFromCellArray( rendered_cells );
-
-  // render the block into each of the candidate cells
-  FOR_EACH( it, *candidate_cells )
-	 {
-		Cell* cell = *it;
-		// record that I am rendered in this cell
-		rendered_cells->push_back( cell ); 
-		// store me in the cell
-		cell->blocks.push_back( this );   
-
-		++cell->region->count;
-		++cell->region->superregion->count;		
-	 }
-
-  // switch current and candidate cell pointers
-  CellPtrVec *tmp = rendered_cells;
-  rendered_cells = candidate_cells;
-  candidate_cells = tmp;
-
-  mapped = true;
 }
 
 inline point_t Block::BlockPointToModelMeters( const point_t& bpt )
@@ -305,43 +257,6 @@ void Block::InvalidateModelPointCache()
 {
   // this doesn't happen often, so this simple strategy isn't too wasteful
   mpts.clear();
-}
-
-void Block::GenerateCandidateCells()
-{
-  candidate_cells->clear();
-	
-	const unsigned int pt_count = pts.size();
-	
-  if( mpts.size() == 0 )
-		{
-		// no valid cache of model coord points, so generate them
-			mpts.resize( pts.size() );
-			
-			
-			for( unsigned int i=0; i<pt_count; i++ )
-				mpts[i] = BlockPointToModelMeters( pts[i] );
-		}
-  
-  gpts.clear();
-  mod->LocalToPixels( mpts, gpts );
-  
-  for( unsigned int i=0; i<pt_count; i++ )
-		mod->world->ForEachCellInLine( gpts[i], 
-																	 gpts[(i+1)%pt_count], 
-																	 *candidate_cells );  
-	
-  // set global Z
-  Pose gpose = mod->GetGlobalPose();
-  gpose.z += mod->geom.pose.z;
-  double scalez = mod->geom.size.z /  mod->blockgroup.GetSize().z;
-  meters_t z = gpose.z - mod->blockgroup.GetOffset().z;
-  
-  // store the block's absolute z bounds at this rendering
-  global_z.min = (scalez * local_z.min) + z;
-  global_z.max = (scalez * local_z.max) + z;
-  
-  mapped = true;
 }
 
 void swap( int& a, int& b )
@@ -360,8 +275,8 @@ void Block::Rasterize( uint8_t* data,
   //printf( "rasterize block %p : w: %u h: %u  scale %.2f %.2f  offset %.2f %.2f\n",
   //	 this, width, height, scalex, scaley, offsetx, offsety );
 	
-	const unsigned int pt_count = pts.size();
-  for( unsigned int i=0; i<pt_count; i++ )
+	const size_t pt_count = pts.size();
+  for( size_t i=0; i<pt_count; ++i )
     {
 		// convert points from local to model coords
 		point_t mpt1 = BlockPointToModelMeters( pts[i] );
@@ -397,7 +312,7 @@ void Block::Rasterize( uint8_t* data,
 	  
 		double dydx = (double) (b.y - a.y) / (double) (b.x - a.x);
 		double y = a.y;
-		for(int x=a.x; x<=b.x; x++)
+		for(int x=a.x; x<=b.x; ++x)
 		  {
 			 if( steep )
 				{
@@ -457,10 +372,10 @@ void Block::DrawFootPrint()
   glEnd();
 }
 
-void Block::DrawSolid()
+void Block::DrawSolid( bool topview )
 {
-// 	if( wheel )
-// 		{
+// 	if( wheel )x
+  // 		{
 // 			glPushMatrix();
 
 // 			glRotatef( 90,0,1,0 );
@@ -477,20 +392,22 @@ void Block::DrawSolid()
 // 			glPopMatrix();
 // 		}
 //   else
-		{
-			DrawSides();
-			DrawTop();
-		}
+  {
+	 if( ! topview )
+		DrawSides();
+	 
+	 DrawTop();
+  }
 }
 
 void Block::Load( Worldfile* wf, int entity )
 {
-	const unsigned int pt_count = wf->ReadInt( entity, "points", 0);
+	const size_t pt_count = wf->ReadInt( entity, "points", 0);
 
   char key[128];
-  for( unsigned int p=0; p<pt_count; p++ )	      
+  for( size_t p=0; p<pt_count; ++p )	      
 	 {
-		snprintf(key, sizeof(key), "point[%d]", p );
+		 snprintf(key, sizeof(key), "point[%d]", (int)p );
 		
 		pts.push_back( point_t(  wf->ReadTupleLength(entity, key, 0, 0),
 														 wf->ReadTupleLength(entity, key, 1, 0) ));
@@ -530,11 +447,9 @@ void pi_ize(radians_t& angle)
     while (M_PI < angle)  angle -= 2 * M_PI;
 }
 
-typedef point_t V2;
-
 static
 /// util; How much was v1 rotated to get to v2?
-radians_t angle_change(V2 v1, V2 v2)
+radians_t angle_change(point_t v1, point_t v2)
 {
     radians_t a1 = atan2(v1.y, v1.x);
     positivize(a1);
@@ -557,7 +472,7 @@ vector<point_t> find_vectors(vector<point_t> const& pts)
     for (unsigned i = 0, n = pts.size(); i < n; ++i)
     {
         unsigned j = (i + 1) % n;
-        vs.push_back(V2(pts[j].x - pts[i].x, pts[j].y - pts[i].y));
+        vs.push_back(point_t(pts[j].x - pts[i].x, pts[j].y - pts[i].y));
     }
     assert(vs.size() == pts.size());
     return vs;

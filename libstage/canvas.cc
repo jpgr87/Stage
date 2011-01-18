@@ -148,7 +148,9 @@ void Canvas::InitTextures()
     {
       PRINT_DEBUG( "Unable to load stall texture.\n" );
     }
-  
+ 
+	printf( "stall icon %s\n", fullpath.c_str() );
+ 
   GLuint stall_id = TextureManager::getInstance().loadTexture( fullpath.c_str() );
   TextureManager::getInstance()._stall_texture_id = stall_id;
 
@@ -158,6 +160,8 @@ void Canvas::InitTextures()
       PRINT_DEBUG( "Unable to load mains texture.\n" );
     }
   
+	printf( "mains icon %s\n", fullpath.c_str() );
+
   GLuint mains_id = TextureManager::getInstance().loadTexture( fullpath.c_str() );
   TextureManager::getInstance()._mains_texture_id = mains_id;
   
@@ -353,12 +357,13 @@ void Canvas::CanvasToWorld( int px, int py,
 
   GLfloat pz;
   glReadPixels( px, h()-py, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &pz );
-  gluUnProject( px, w()-py, pz, modelview, projection, viewport, wx,wy,wz );
-	
+  gluUnProject( px, w()-py, pz, modelview, projection, viewport, wx,wy,wz );	
 }
 
 int Canvas::handle(int event) 
 {
+  //printf( "cam %.2f %.2f\n", camera.yaw(), camera.pitch() );
+
   switch(event) 
     {
     case FL_MOUSEWHEEL:
@@ -934,20 +939,23 @@ void Canvas::renderFrame()
   // ((Model*)it->data)->DrawOriginTree();
   
   // draw the model-specific visualizations
-  if( showData ) {
-    if ( ! visualizeAll ) {
-      FOR_EACH( it, world->World::children )
-		  (*it)->DataVisualizeTree( current_camera );
-    }
-    else if ( selected_models.size() > 0 ) {
-      FOR_EACH( it, world->World::children )
-		  (*it)->DataVisualizeTree( current_camera );
-    }
-    else if ( last_selection ) {
-      last_selection->DataVisualizeTree( current_camera );
-    }
-  }
-   
+  if( world->sim_time > 0 )
+	 {
+		if( showData ) {
+		  if ( ! visualizeAll ) {
+			 FOR_EACH( it, world->World::children )
+				(*it)->DataVisualizeTree( current_camera );
+		  }
+		  else if ( selected_models.size() > 0 ) {
+			 FOR_EACH( it, world->World::children )
+				(*it)->DataVisualizeTree( current_camera );
+		  }
+		  else if ( last_selection ) {
+			 last_selection->DataVisualizeTree( current_camera );
+		  }
+		}
+	 }
+
   if( showGrid ) 
     FOR_EACH( it, models_sorted )
       (*it)->DrawGrid();

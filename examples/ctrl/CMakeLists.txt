@@ -5,9 +5,10 @@ SET( PLUGINS
      source
      wander
 #	  wander_pioneer
-#	  pioneer_flocking
-     rasterize
-	  dynamic
+	  pioneer_flocking
+    rasterize
+	  lasernoise
+    dynamic
 )
 
 # need plaer's wavefront planning library for this one
@@ -23,6 +24,7 @@ foreach( PLUGIN ${PLUGINS} )
 endforeach( PLUGIN )
 				
 ADD_LIBRARY( fasr2 MODULE fasr2.cc astar/findpath.cpp )
+# ADD_LIBRARY( fasr3 MODULE fasr3.cc astar/findpath.cpp )
 #ADD_LIBRARY( energy MODULE energy.cc astar/findpath.cpp )
 
 # add extras to the list of plugins

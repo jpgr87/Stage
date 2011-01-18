@@ -25,6 +25,27 @@
  * CVS: $Id$
  */
 
+// DOCUMENTATION ------------------------------------------------------------
+
+/** @addtogroup player
+@par Graphics2D interface
+-	PLAYER_GRAPHICS2D_CMD_POINTS
+-	PLAYER_GRAPHICS2D_CMD_POLYGON
+-	PLAYER_GRAPHICS2D_CMD_MULTILINE
+-	PLAYER_GRAPHICS2D_CMD_POLYLINE
+-	PLAYER_GRAPHICS2D_CMD_CLEAR
+
+@par Graphics3D interface
+-	PLAYER_GRAPHICS3D_CMD_DRAW
+-	PLAYER_GRAPHICS3D_CMD_PUSH
+-	PLAYER_GRAPHICS3D_CMD_POP
+-	PLAYER_GRAPHICS3D_CMD_CLEAR
+-	PLAYER_GRAPHICS3D_CMD_TRANSLATE
+-	PLAYER_GRAPHICS3D_CMD_ROTATE
+
+*/
+
+
 #include "p_driver.h"
 
 #include <iostream>
@@ -217,6 +238,8 @@ int InterfaceGraphics2d::ProcessMessage(QueuePointer & resp_queue,
                                         PLAYER_GRAPHICS2D_CMD_MULTILINE, this->addr)
 #endif
 			|| Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
+                                        PLAYER_GRAPHICS2D_CMD_MULTILINE, this->addr)
+			|| Message::MatchMessage(hdr, PLAYER_MSGTYPE_CMD,
 					PLAYER_GRAPHICS2D_CMD_POLYGON, this->addr)) {
 		Message msg(*hdr, data);
 		vis->AppendItem(resp_queue.get(), msg);
@@ -255,8 +278,12 @@ void PlayerGraphics2dVis::RenderItem(Message & item) {
 		glEnd();
 	}
 		break;
+<<<<<<< .merge_file_ABe7fz
 // Draw Multiline is new in Player 3.1, this ifdef allows Stage to build against older versions of Player
 #if defined PLAYER_GRAPHICS2D_CMD_MULTILINE
+=======
+
+>>>>>>> .merge_file_kk3uew
         case PLAYER_GRAPHICS2D_CMD_MULTILINE: {
                 player_graphics2d_cmd_multiline_t
                                 & data =
@@ -269,7 +296,11 @@ void PlayerGraphics2dVis::RenderItem(Message & item) {
         }
                 break;
 
+<<<<<<< .merge_file_ABe7fz
 #endif
+=======
+
+>>>>>>> .merge_file_kk3uew
 
 
 

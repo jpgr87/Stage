@@ -169,6 +169,9 @@ uint64_t Model::trail_interval(5);
 std::map<Stg::id_t,Model*> Model::modelsbyid;
 std::map<std::string, creator_t> Model::name_map;
 
+//static const members
+static const double DEFAULT_FRICTION = 0.0;
+
 void Bounds::Load( Worldfile* wf, const int section, const char* keyword )
 {
 	if( CProperty* prop = wf->GetProperty( section, keyword ) )	
@@ -297,8 +300,6 @@ Model::Visibility::Visibility() :
   ranger_return( 1.0 )
 { /* nothing to do */ }
 
-//static const members
-static const double DEFAULT_FRICTION = 0.0;
 
 void Model::Visibility::Load( Worldfile* wf, int wf_entity )
 {
@@ -341,6 +342,8 @@ Model::Model( World* world,
 							Model* parent,
 				  const std::string& type ) :
   Ancestor(), 	 
+  mapped(false),
+  drawOptions(),
   alwayson(false),
   blockgroup(),
   blocks_dl(0),
@@ -351,6 +354,7 @@ Model::Model( World* world,
   disabled(false),
   cv_list(),
   flag_list(),
+	friction(DEFAULT_FRICTION),
   geom(),
   has_default_block( true ),
   id( Model::count++ ),
@@ -408,9 +412,7 @@ Model::Model( World* world,
     }
 
   world->AddModel( this );
-  
-  this->friction = DEFAULT_FRICTION;
-    
+      
   // now we can add the basic square shape
   AddBlockRect( -0.5, -0.5, 1.0, 1.0, 1.0 );
 
@@ -423,17 +425,20 @@ Model::~Model( void )
 {
   // children are removed in ancestor class
   
-  // remove myself from my parent's child list, or the world's child
-  // list if I have no parent
-
-	if( world ) // if I'm not a worldless dummy model
-		{
-			UnMap(); // remove from the raytrace bitmap
-			
-			EraseAll( this, parent ? parent->children : world->children );			
-			modelsbyid.erase(id);			
-			world->RemoveModel( this );
-		}
+  if( world ) // if I'm not a worldless dummy model
+	 {
+		UnMap(0); // remove from the movable model array
+		UnMap(1); // remove from the moveable model array
+	 		
+		// remove myself from my parent's child list, or the world's child
+		// list if I have no parent		
+		EraseAll( this, parent ? parent->children : world->children );			
+		
+		// erase from the static map of all models
+		modelsbyid.erase(id);			
+				
+		world->RemoveModel( this );
+	 }
 }
 
 
@@ -483,9 +488,10 @@ Model::Flag* Model::PopFlag()
   return flag;
 }
 
-void Model::ClearBlocks( void )
+void Model::ClearBlocks()
 {
-  UnMap();
+  blockgroup.UnMap(0);
+  blockgroup.UnMap(1);  
   blockgroup.Clear();
   //no need to Map() -  we have no blocks
   NeedRedraw();
@@ -509,9 +515,10 @@ Block* Model::AddBlockRect( meters_t x,
 														meters_t dy,
 														meters_t dz )
 {  
-  UnMap();
-
-	std::vector<point_t> pts(4);
+  UnMap(0);
+  UnMap(1);
+  
+  std::vector<point_t> pts(4);
   pts[0].x = x;
   pts[0].y = y;
   pts[1].x = x + dx;
@@ -522,14 +529,17 @@ Block* Model::AddBlockRect( meters_t x,
   pts[3].y = y + dy;
   
   Block* newblock =  new Block( this,
-																pts,
-																0, dz, 
-																color,
-																true, 
-																false );
-
+										  pts,
+										  0, dz, 
+										  color,
+										  true, 
+										  false );
+  
   blockgroup.AppendBlock( newblock );
-
+  
+  Map(0);
+  Map(1);
+  
   return newblock;
 }
 
@@ -664,43 +674,34 @@ void Model::LocalToPixels( const std::vector<point_t>& local,
 		}
 }
 
-void Model::MapWithChildren()
+void Model::MapWithChildren( unsigned int layer )
 {
-  UnMap();
-  Map();
+  UnMap(layer);
+  Map(layer);
 
   // recursive call for all the model's children
   FOR_EACH( it, children )
-    (*it)->MapWithChildren();
+    (*it)->MapWithChildren(layer);
 }
 
-void Model::MapFromRoot()
+void Model::MapFromRoot( unsigned int layer )
 {
-	Root()->MapWithChildren();
+	Root()->MapWithChildren(layer);
 }
 
-void Model::UnMapWithChildren()
+void Model::UnMapWithChildren(unsigned int layer)
 {
-  UnMap();
+  UnMap(layer);
 
   // recursive call for all the model's children
   FOR_EACH( it, children )
-    (*it)->UnMapWithChildren();
+    (*it)->UnMapWithChildren(layer);
 }
 
-void Model::UnMapFromRoot()
+void Model::UnMapFromRoot(unsigned int layer)
 {
-	Root()->UnMapWithChildren();
+	Root()->UnMapWithChildren(layer);
 }
-
-void Model::Map()
-{
-  //PRINT_DEBUG1( "%s.Map()", token );
-
-  // render all blocks in the group at my global pose and size
-  blockgroup.Map();
-} 
-
 
 void Model::Subscribe( void )
 {
@@ -768,19 +769,21 @@ void Model::Startup( void )
 {
   //printf( "Startup model %s\n", this->token );  
   //printf( "model %s using queue %d\n", token, event_queue_num );
-
+	
   // if we're thread safe, we can use an event queue >0  
-  if( thread_safe )
-	 event_queue_num = world->GetEventQueue( this );
-
+	event_queue_num = world->GetEventQueue( this );
+	
   // put my first update request in the world's queue
-  world->Enqueue( event_queue_num, interval, this );
+	if( thread_safe )
+		world->Enqueue( event_queue_num, interval, this, UpdateWrapper, NULL );
+	else
+		world->Enqueue( 0, interval, this, UpdateWrapper, NULL );
 	
 	if( velocity_enable )
-		world->active_velocity.insert( this );
+	  world->active_velocity.insert(this);
 	
   if( FindPowerPack() )
-	 world->active_energy.insert( this );
+		world->active_energy.insert( this );
   
 	CallCallbacks( CB_STARTUP );
 }
@@ -788,8 +791,8 @@ void Model::Startup( void )
 void Model::Shutdown( void )
 {
   //printf( "Shutdown model %s\n", this->token );
-	CallCallbacks( CB_SHUTDOWN );
-
+  CallCallbacks( CB_SHUTDOWN );
+  
   world->active_energy.erase( this );
   world->active_velocity.erase( this );
   
@@ -800,12 +803,29 @@ void Model::Shutdown( void )
 
 void Model::Update( void )
 { 
-	CallCallbacks( CB_UPDATE );
+	//printf( "Q%d model %p %s update\n", event_queue_num, this, Token() );
 
+	//	CallCallbacks( CB_UPDATE );
+	
   last_update = world->sim_time;  
-  world->Enqueue( event_queue_num, interval, this );
+	
+	if( subs > 0 ) // no subscriptions means we don't need to be updated
+		world->Enqueue( event_queue_num, interval, this, UpdateWrapper, NULL );
+	
+	// if we updated the model then it needs to have its update
+	// callback called in series back in the main thread. It's
+	// not safe to run user callbacks in a worker thread, as
+	// they may make OpenGL calls or unsafe Stage API calls,
+	// etc. We queue up the callback into a queue specific to
+
+	if( ! callbacks[Model::CB_UPDATE].empty() )
+		world->pending_update_callbacks[event_queue_num].push(this);					
 }
 
+void Model::CallUpdateCallbacks( void )
+{
+	CallCallbacks( CB_UPDATE );
+}
 
 meters_t Model::ModelHeight() const
 {	
@@ -836,7 +856,7 @@ void Model::AddToPose( const Pose& pose )
 void Model::PlaceInFreeSpace( meters_t xmin, meters_t xmax, 
 			      meters_t ymin, meters_t ymax )
 {
-  while( TestCollisionTree() )
+  while( TestCollision() )
     SetPose( Pose::Random( xmin,xmax, ymin, ymax ));		
 }
 
@@ -845,22 +865,17 @@ void Model::AppendTouchingModels( ModelPtrSet& touchers )
   blockgroup.AppendTouchingModels( touchers );
 }
 
-Model* Model::TestCollision()
-{
-  //printf( "mod %s test collision...\n", token );  
-  return( blockgroup.TestCollision() );
-}
 
-Model* Model::TestCollisionTree()
+Model* Model::TestCollision()
 {  
-  Model* hitmod = TestCollision();
+  Model* hitmod = blockgroup.TestCollision();
   
   if( hitmod == NULL ) 	 
 	 FOR_EACH( it, children )
-      { 
-		  hitmod = (*it)->TestCollisionTree();
-		  if( hitmod )
-			 break;
+		 { 
+			 hitmod = (*it)->TestCollision();
+			 if( hitmod )
+				 break;
       }
   
   //printf( "mod %s test collision done.\n", token );
@@ -918,60 +933,53 @@ void Model::UpdateCharge()
 	 }
 }
 
-void Model::CommitTestedPose()
-{
-  FOR_EACH( it, children )
-    (*it)->CommitTestedPose();
-  
-  blockgroup.SwitchToTestedCells();
-}
-  
-Model* Model::ConditionalMove( const Pose& newpose )
-{ 
-  //assert( newpose.a >= -M_PI );
-  //assert( newpose.a <=  M_PI );
 
-  const Pose startpose( pose );
-  pose = newpose; // do the move provisionally - we might undo it below
-     
-  Model* hitmod( TestCollisionTree() );
- 
-  if( hitmod )
-	 {
-		pose = startpose; // move failed - put me back where I started
-	 }
-  else
-    {
-      CommitTestedPose(); //recursively commit to blocks to the new pose 
-      world->dirty = true; // need redraw
-    }
-  
-  return hitmod;
-}
-
-
-void Model::UpdatePose( void )
-{
+void Model::Move( void )
+{  
   if( velocity.IsZero() )
 	 return;
 
   if( disabled )
-    return;
-  
+	 return;
+
   // convert usec to sec
-  double interval( (double)world->sim_interval / 1e6 );
+  const double interval( (double)world->sim_interval / 1e6 );
   
   // find the change of pose due to our velocity vector
-  Pose p( velocity.x * interval,
-					velocity.y * interval,
-					velocity.z * interval,
-					normalize( velocity.a * interval ));
+  const Pose p( velocity.x * interval,
+					 velocity.y * interval,
+					 velocity.z * interval,
+					 normalize( velocity.a * interval ));
   
-  // attempts to move to the new pose. If the move fails because we'd
-  // hit another model, that model is returned.	
-	// ConditionalMove() returns a pointer to the model we hit, or
-	// NULL. We use this as a boolean for SetStall()
-  SetStall( ConditionalMove( pose + p ) );
+  // the pose we're trying to achieve (unless something stops us)
+  const Pose newpose( pose + p );
+  
+  // stash the original pose so we can put things back if we hit
+  const Pose startpose( pose );
+  
+  pose = newpose; // do the move provisionally - we might undo it below
+  
+  //const unsigned int layer( world->updates%2 );
+  
+  const unsigned int layer( world->updates%2 );
+  
+  UnMapWithChildren( layer ); // remove from all blocks
+  MapWithChildren( layer ); // render into new blocks
+  
+  if( TestCollision() ) // crunch!
+	 {
+		// put things back the way they were
+		// this is expensive, but it happens _very_ rarely for most people
+		pose = startpose;
+		UnMapWithChildren( layer );
+		MapWithChildren( layer );
+		SetStall(true);
+	 }
+  else
+	 {
+		world->dirty = true; // need redraw	
+		SetStall(false);
+	 }
 }
 
 
@@ -1063,9 +1071,23 @@ kg_t Model::GetMassOfChildren() const
   return( GetTotalMass() - mass);
 }
 
-void Model::UnMap()
+void Model::Map( unsigned int layer )
 {
-  blockgroup.UnMap();
+  if( ! mapped )
+	 {
+		// render all blocks in the group at my global pose and size
+		blockgroup.Map( layer );
+		mapped = true;
+	 }
+} 
+
+void Model::UnMap( unsigned int layer )
+{
+  if( mapped )
+	 {
+		blockgroup.UnMap(layer);
+		mapped = false;
+	 }
 }
 
 void Model::BecomeParentOf( Model* child )
@@ -1193,8 +1215,8 @@ void Model::RasterVis::Visualize( Model* mod, Camera* cam )
 
   mod->PushColor( 0,0,0,0.5 );
   glPolygonMode( GL_FRONT, GL_FILL );
-  for( unsigned int y=0; y<height; y++ )
-	 for( unsigned int x=0; x<width; x++ )
+  for( unsigned int y=0; y<height; ++y )
+	 for( unsigned int x=0; x<width; ++x )
 		{
 		  // printf( "[%u %u] ", x, y );
 		  if( data[ x + y*width ] )
@@ -1205,8 +1227,8 @@ void Model::RasterVis::Visualize( Model* mod, Camera* cam )
 
   mod->PushColor( 0,0,0,1 );
   glPolygonMode( GL_FRONT, GL_LINE );
-  for( unsigned int y=0; y<height; y++ )
-	 for( unsigned int x=0; x<width; x++ )
+  for( unsigned int y=0; y<height; ++y )
+	 for( unsigned int x=0; x<width; ++x )
 		{
 		  if( data[ x + y*width ] )
 			 glRectf( x, y, x+1, y+1 );

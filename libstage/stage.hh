@@ -146,7 +146,7 @@ namespace Stg
     "\n"								\
     "The text of the license may also be available online at\n"		\
     "http://www.gnu.org/licenses/old-licenses/gpl-2.0.html\n";
-  
+
   /** Convenient constant */
   const double thousand = 1e3;
 
@@ -495,16 +495,16 @@ namespace Stg
 		point_int_t( int x, int y ) : x(x), y(y){}	 
 		point_int_t() : x(0), y(0){}
 		
-		/** required to put these in sorted containers like std::map */
-		bool operator<( const point_int_t& other ) const
-		{
-			if( x < other.x ) return true;
-			if( other.x < x ) return false;
-			return y < other.y;
-		}
- 
-	 bool operator==( const point_int_t& other ) const
-		{ return ((x == other.x) && (y == other.y) ); }
+ 		/** required to put these in sorted containers like std::map */
+ 		bool operator<( const point_int_t& other ) const
+ 		{
+ 			if( x < other.x ) return true;
+ 			if( other.x < x ) return false;
+ 			return y < other.y;
+ 		}
+		
+ 	 bool operator==( const point_int_t& other ) const
+ 		{ return ((x == other.x) && (y == other.y) ); }
   };
   
   typedef std::vector<point_int_t> PointIntVec;
@@ -605,9 +605,16 @@ namespace Stg
 												  Model* finder, 
 												  const void* arg );
 
-  // STL container iterator macros
+  // STL container iterator macros - __typeof is a gcc extension, so
+  // this could be an issue one day.
 #define VAR(V,init) __typeof(init) V=(init)
-#define FOR_EACH(I,C) for(VAR(I,(C).begin());I!=(C).end();I++)
+
+//#define FOR_EACH(I,C) for(VAR(I,(C).begin());I!=(C).end();++I) 
+
+// NOTE:
+// this version assumes the container is not modified in the loop,
+// which I think is true everywhere it is used in Stage
+#define FOR_EACH(I,C) for(VAR(I,(C).begin()),ite=(C).end();(I)!=ite;++(I))
 
 /** wrapper for Erase-Remove method of removing all instances of thing from container */
   template <class T, class C>
@@ -718,11 +725,11 @@ namespace Stg
 	 void SetProperty( std::string& key, void* value ){ props[ key ] = value; }
 	 
 	 /** A key-value database for users to associate arbitrary things with this model. */
-	 void* GetProperty( std::string& key )
-	 {
-		std::map<std::string,void*>::iterator it = props.find( key );		
-		return( it == props.end() ? NULL : it->second );
-	 }
+		void* GetProperty( std::string& key )
+		{
+			std::map<std::string,void*>::iterator it = props.find( key );		
+			return( it == props.end() ? NULL : it->second );
+		}
   };
 
   /** raytrace sample
@@ -800,6 +807,18 @@ namespace Stg
   /// %World class
   class World : public Ancestor
   {
+	private: 
+	 //pthread_mutex_t bflock;
+	 //pthread_rwlock_t rwlock;
+
+	public:
+		//inline int Lock(){ return pthread_mutex_lock( &bflock ); }
+		//inline int Unlock(){ return pthread_mutex_unlock( &bflock ); }
+
+		//inline int ReadLock(){ return pthread_mutex_lock( &bflock ); }
+		//inline int WriteLock(){ return pthread_mutex_lock( &bflock ); }
+		//inline int Unlock(){ return pthread_mutex_unlock( &bflock ); }
+		
     friend class Block;
     friend class Model; // allow access to private members
     friend class ModelFiducial;
@@ -820,10 +839,7 @@ namespace Stg
 	 
     bool destroy;
     bool dirty; ///< iff true, a gui redraw would be required
-
-	 /** Models that should be rendered into the background just-in-time, before sensing occurs */
-	 //std::vector<Model*> jit_render;
-
+	 
 	 /** Pointers to all the models in this world. */
 	 std::set<Model*> models;
 
@@ -847,7 +863,12 @@ namespace Stg
 			bool operator()(const Model* a, const Model* b) const;
 		};
 		
+		/** maintain a set of models with fiducials sorted by pose.x, for
+				quickly finding nearby fidcucials */
 		std::set<Model*,ltx> models_with_fiducials_byx;
+		
+		/** maintain a set of models with fiducials sorted by pose.y, for
+				quickly finding nearby fidcucials */
 		std::set<Model*,lty> models_with_fiducials_byy;
 					 
 	 /** Add a model to the set of models with non-zero fiducials, if not already there. */
@@ -868,9 +889,9 @@ namespace Stg
 	 
 	 bool show_clock; ///< iff true, print the sim time on stdout
 	 unsigned int show_clock_interval; ///< updates between clock outputs
-
-    pthread_mutex_t thread_mutex; ///< protect the worker thread management stuff
-	 unsigned int threads_working; ///< the number of worker threads not yet finished
+		
+    pthread_mutex_t sync_mutex; ///< protect the worker thread management stuff
+		unsigned int threads_working; ///< the number of worker threads not yet finished
     pthread_cond_t threads_start_cond; ///< signalled to unblock worker threads
     pthread_cond_t threads_done_cond; ///< signalled by last worker thread to unblock main thread
     int total_subs; ///< the total number of subscriptions to all models
@@ -948,15 +969,15 @@ namespace Stg
 
     virtual Model* RecentlySelectedModel() const { return NULL; }
 		
+		/** call Cell::AddBlock(block) for each cell on the polygon */
+    void MapPoly( const PointIntVec& poly,
+									Block* block,
+									unsigned int layer );
+
     SuperRegion* AddSuperRegion( const point_int_t& coord );
-    SuperRegion* GetSuperRegion( int32_t x, int32_t y );
-    void ExpireSuperRegion( SuperRegion* sr );
-		
-		/** add a Cell pointer to the vector for each cell on the line from
-				pt1 to pt2 inclusive */
-    void ForEachCellInLine( const point_int_t& pt1,
-														const point_int_t& pt2, 
-														CellPtrVec& cells );
+    SuperRegion* GetSuperRegion( const point_int_t& org );
+    SuperRegion* GetSuperRegionCreate( const point_int_t& org );
+    //void ExpireSuperRegion( SuperRegion* sr );
 		
     /** convert a distance in meters to a distance in world occupancy
 		  grid pixels */
@@ -999,7 +1020,7 @@ namespace Stg
 		
 		
     /** Enlarge the bounding volume to include this point */
-    void Extend( point3_t pt );
+    inline void Extend( point3_t pt );
   
     virtual void AddModel( Model* mod );
     virtual void RemoveModel( Model* mod );
@@ -1024,13 +1045,15 @@ namespace Stg
     {
     public:
       
-      Event( usec_t time, Model* mod ) 
-		  : time(time), mod(mod) {}
-      
+      Event( usec_t time, Model* mod, model_callback_t cb, void* arg ) 
+				: time(time), mod(mod), cb(cb), arg(arg) {}
+			
       usec_t time; ///< time that event occurs
-      Model* mod; ///< model to update
-      
-			/** order by time. Break ties by value of Model*. 
+      Model* mod; ///< model to pass into callback
+      model_callback_t cb;
+			void* arg;
+			
+			/** order by time. Break ties by value of Model*, then cb*. 
 					@param event to compare with this one. */
       bool operator<( const Event& other ) const;
     };
@@ -1038,6 +1061,9 @@ namespace Stg
 		/** Queue of pending simulation events for the main thread to handle. */
 	 std::vector<std::priority_queue<Event> > event_queues;
 
+		/** Queue of pending simulation events for the main thread to handle. */
+		std::vector<std::queue<Model*> > pending_update_callbacks;
+		
 		/** Create a new simulation event to be handled in the future.
 
 				@param queue_num Specify which queue the event should be on. The main
@@ -1049,17 +1075,23 @@ namespace Stg
 				@param mod The model that should have its Update() method
 				called at the specified time.
 		*/
-	 void Enqueue( unsigned int queue_num, usec_t delay, Model* mod );
-	 
+		void Enqueue( unsigned int queue_num, usec_t delay, Model* mod, model_callback_t cb, void* arg )
+		{  event_queues[queue_num].push( Event( sim_time + delay, mod, cb, arg ) ); }
+		
 		/** Set of models that require energy calculations at each World::Update(). */
 	 std::set<Model*> active_energy;
 
 		/** Set of models that require their positions to be recalculated at each World::Update(). */
 	 std::set<Model*> active_velocity;
-
+		
 	 /** The amount of simulated time to run for each call to Update() */
 	 usec_t sim_interval;
-	 
+		
+		// debug instrumentation - making sure the number of update callbacks
+		// in each thread is consistent with the number that have been
+		// registered globally
+		int update_cb_count;
+
 	 /** consume events from the queue up to and including the current sim_time */
 	 void ConsumeQueue( unsigned int queue_num );
 
@@ -1154,7 +1186,7 @@ namespace Stg
 	 Model* GetGround() {return ground;};
 	
   };
-
+  
   class Block
   {
     friend class BlockGroup;
@@ -1162,11 +1194,12 @@ namespace Stg
     friend class SuperRegion;
     friend class World;
     friend class Canvas;
+		friend class Cell;
   public:
-  
+		
     /** Block Constructor. A model's body is a list of these
-		  blocks. The point data is copied, so pts can safely be freed
-		  after constructing the block.*/
+				blocks. The point data is copied, so pts can safely be freed
+				after constructing the block.*/
     Block( Model* mod,  
 					 const std::vector<point_t>& pts,
 					 meters_t zmin,
@@ -1174,20 +1207,20 @@ namespace Stg
 					 Color color,
 					 bool inherit_color,
 					 bool wheel );
-  
+		
     /** A from-file  constructor */
     Block(  Model* mod,  Worldfile* wf, int entity);
-	 
+		
     ~Block();
 	 
     /** render the block into the world's raytrace data structure */
-    void Map(); 	 
+    void Map( unsigned int layer ); 	 
 	 
     /** remove the block from the world's raytracing data structure */
-    void UnMap();	 
-	 
+    void UnMap( unsigned int layer );	 
+	 	 
 	 /** draw the block in OpenGL as a solid single color */    
-	 void DrawSolid();
+	 void DrawSolid(bool topview);
 
 	 /** draw the projection of the block onto the z=0 plane	*/
     void DrawFootPrint(); 
@@ -1213,14 +1246,11 @@ namespace Stg
 	 /** Set the extent in Z of the block */
 	 void SetZ( double min, double max );
 		
-    inline void RemoveFromCellArray( CellPtrVec* blocks );
-    inline void GenerateCandidateCells();  
-		
 		void AppendTouchingModels( ModelPtrSet& touchers );
 	 
 	 /** Returns the first model that shares a bitmap cell with this model */
     Model* TestCollision(); 
-    void SwitchToTestedCells();  
+
     void Load( Worldfile* wf, int entity );  
     Model* GetModel(){ return mod; };  
     const Color& GetColor();		
@@ -1248,19 +1278,11 @@ namespace Stg
 		
 		/** record the list entries for the cells where this block is rendered */
 		std::vector< std::list<Block*>::iterator > list_entries;
-
+		
     /** record the cells into which this block has been rendered to
-		  UnMapping them very quickly. */  
-	 CellPtrVec * rendered_cells;
-
-    /** When moving a model, we test for collisions by generating, for
-		  each block, a list of the cells in which it would be rendered if the
-		  move were to be successful. If no collision occurs, the move is
-		  allowed - the rendered cells are cleared, the potential cells are
-		  written, and the pointers to the rendered and potential cells are
-		  switched for next time (avoiding a memory copy).*/
-	 CellPtrVec * candidate_cells;
-	
+				UnMapping them very quickly. */  
+		CellPtrVec rendered_cells[2];
+		
 	 PointIntVec gpts;
 	
 	 /** find the position of a block's point in model coordinates
@@ -1269,6 +1291,7 @@ namespace Stg
 	
 	 /** invalidate the cache of points in model coordinates */
 	 void InvalidateModelPointCache();
+		
   };
 
 	
@@ -1309,11 +1332,9 @@ namespace Stg
 		  with a block in this group, or NULL, if none are detected. */
     Model* TestCollision();
  
-    void SwitchToTestedCells();
-	 
-    void Map();
-    void UnMap();
-	 
+    void Map( unsigned int layer );
+    void UnMap( unsigned int layer );
+		
 	 /** Draw the block in OpenGL as a solid single color. */
     void DrawSolid( const Geom &geom); 
 
@@ -1555,6 +1576,8 @@ namespace Stg
     /** Get human readable string that describes the current global energy state. */
     std::string EnergyString( void ) const;	
     virtual void RemoveChild( Model* mod );	 
+
+	 bool IsTopView();
   };
 
 
@@ -1707,12 +1730,16 @@ namespace Stg
     friend class BlockGroup;
     friend class PowerPack;
     friend class Ray;
-		friend class ModelFiducial;
-
+	 friend class ModelFiducial;
+		
   private:
-	 /** the number of models instatiated - used to assign unique IDs */
-	 static uint32_t count;
-	 static std::map<id_t,Model*> modelsbyid;
+		/** the number of models instatiated - used to assign unique IDs */
+		static uint32_t count;
+		static std::map<id_t,Model*> modelsbyid;
+
+		/** records if this model has been mapped into the world bitmap*/
+		bool mapped;
+
 	 std::vector<Option*> drawOptions;
 	 const std::vector<Option*>& getOptions() const { return drawOptions; }
 	 
@@ -1721,9 +1748,6 @@ namespace Stg
 	 /** If true, the model always has at least one subscription, so
 		  always runs. Defaults to false. */
 	 bool alwayson;
-
-	 /** If true, the model is rendered lazily into the regions, to reduce memory use. */
-	 // TODO bool background;
 
 	 BlockGroup blockgroup;
 	 /**  OpenGL display list identifier for the blockgroup */
@@ -1814,10 +1838,6 @@ namespace Stg
 	 /** Default color of the model's blocks.*/
 	 Color color;
 		
-		/** Model the interaction between the model's blocks and the
-				surface they touch. @todo primitive at the moment */
-	 double friction;
-		
 	 /** This can be set to indicate that the model has new data that
 		  may be of interest to users. This allows polling the model
 		  instead of adding a data callback. */
@@ -1833,6 +1853,10 @@ namespace Stg
 
 		/** Container for flags attached to this model. */
 	 std::list<Flag*> flag_list;
+		
+		/** Model the interaction between the model's blocks and the
+				surface they touch. @todo primitive at the moment */
+	 double friction;
 		
 		/** Specifies the the size of this model's bounding box, and the
 				offset of its local coordinate system wrt that its parent. */
@@ -2033,27 +2057,24 @@ namespace Stg
 	 void RegisterOption( Option* opt );
 
 	 void AppendTouchingModels( ModelPtrSet& touchers );
-
-	 /** Check to see if the current pose will yield a collision with
-		  obstacles.  Returns a pointer to the first entity we are in
-		  collision with, or NULL if no collision exists. */
+		
+		/** Check to see if the current pose will yield a collision with
+				obstacles.  Returns a pointer to the first entity we are in
+				collision with, or NULL if no collision exists.  Recursively
+				calls TestCollision() on all descendents. */		
 	 Model* TestCollision();
-
-	 /** Recursively call TestCollision() on this model and all its
-		  descendents */
-    Model* TestCollisionTree();
   
 	 void CommitTestedPose();
 
-	 void Map();
-	 void UnMap();
+	 void Map( unsigned int layer );
+	 void UnMap( unsigned int layer );
 
-	 void MapWithChildren();
-	 void UnMapWithChildren();
+	 void MapWithChildren( unsigned int layer );
+	 void UnMapWithChildren( unsigned int layer );
   
 	 // Find the root model, and map/unmap the whole tree.
-	 void MapFromRoot();
-	 void UnMapFromRoot();
+	 void MapFromRoot( unsigned int layer );
+	 void UnMapFromRoot( unsigned int layer );
 
 	 /** raytraces a single ray from the point and heading identified by
 		  pose, in local coords */
@@ -2089,19 +2110,17 @@ namespace Stg
 						 const uint32_t sample_count,
 						 const bool ztest = true );
   
+		virtual void Startup();
+		virtual void Shutdown();
+		virtual void Update();
+		virtual void Move();
+		virtual void UpdateCharge();
+		
+		static int UpdateWrapper( Model* mod, void* arg ){ mod->Update(); return 0; }
+		static int MoveWrapper( Model* mod, void* arg ){ mod->Move(); return 0; }
 
-	 /** Causes this model and its children to recompute their global
-		  position instead of using a cached pose in
-		  Model::GetGlobalPose()..*/
-	 //void GPoseDirtyTree();
-
-	 virtual void Startup();
-	 virtual void Shutdown();
-	 virtual void Update();
-	 virtual void UpdatePose();
-	 virtual void UpdateCharge();
-
-	 Model* ConditionalMove( const Pose& newpose );
+		/** Calls CallCallback( CB_UPDATE ) */
+		void CallUpdateCallbacks( void );
 
 	 meters_t ModelHeight() const;
 
@@ -2234,10 +2253,10 @@ namespace Stg
 
 	 /** Add a block to this model centered at [x,y] with extent [dx, dy,
 		  dz] */
-	 Block* AddBlockRect( meters_t x, meters_t y, 
-								 meters_t dx, meters_t dy, 
-								 meters_t dz );
-	
+		Block*	AddBlockRect( meters_t x, meters_t y, 
+													meters_t dx, meters_t dy, 
+													meters_t dz );
+		
 	 /** remove all blocks from this model, freeing their memory */
 	 void ClearBlocks();
   
@@ -2506,83 +2525,6 @@ namespace Stg
 
 
 
-
-//   // LASER MODEL --------------------------------------------------------
-  
-//   /// %ModelLaser class
-//   class ModelLaser : public Model
-//   {
-//   public:
-// 	 /** Laser range data */
-// 	 class Sample
-// 	 {
-// 	 public:
-// 		meters_t range; ///< range to laser hit in meters
-// 	  double reflectance; ///< intensity of the reflection 0.0 to 1.0
-// 	 };
-		
-// 	 /** Convenience object for setting parameters using SetConfig/GetConfig */
-// 	 class Config
-// 	 {
-// 	 public:
-// 		uint32_t sample_count; ///< Number of range samples
-// 		uint32_t resolution; ///< interpolation
-// 		Bounds range_bounds; ///< min and max ranges
-// 		radians_t fov; ///< Field of view, centered about the pose angle
-// 	 }; 
-		
-//   private:	 
-// 	 class Vis : public Visualizer 
-// 	 {
-// 	 private:
-// 		static Option showArea;
-// 		static Option showStrikes;
-// 		static Option showFov;
-// 		static Option showBeams;
-
-// 	 public:
-// 		Vis( World* world );		virtual ~Vis( void ){}
-// 		virtual void Visualize( Model* mod, Camera* cam );
-// 	 } vis;
-	 	
-// 		unsigned int sample_count;
-// 		std::vector<Sample> samples;
-		
-// 	public:
-// 		meters_t range_max;
-// 		radians_t fov;
-// 		uint32_t resolution;
-    
-// 	 // set up data buffers after the config changes
-// 	 void SampleConfig();
-
-//   public:
-// 	 // constructor
-// 	 ModelLaser( World* world,
-// 					 Model* parent,
-// 					 const std::string& type ); 
-  
-// 	 // destructor
-// 	 ~ModelLaser();
-	
-// 	 virtual void Startup();
-// 	 virtual void Shutdown();
-// 	 virtual void Update();
-// 	 virtual void Load();
-// 	 virtual void Print( char* prefix ) const;
-  
-// 	 /** returns a const reference to a vector of range and reflectance samples */
-// 	 const std::vector<Sample>& GetSamples() const;
-	 
-// 	 /** returns a mutable reference to a vector of range and reflectance samples */
-// 	 std::vector<Sample>& GetSamples();
-
-// 	 /** Get the user-tweakable configuration of the laser */
-// 	 Config GetConfig( ) const;
-	 
-// 	 /** Set the user-tweakable configuration of the laser */
-// 	 void SetConfig( Config& cfg );  
-//   };
   
 
   // Light indicator model
@@ -2849,7 +2791,9 @@ namespace Stg
 								 range( 0.0, 5.0 ),
 								 fov( 0.1 ), 
 								 sample_count(1),
-								 col( 0,1,0,0.3 ) 
+								 col( 0,1,0,0.3 ),
+								 ranges(),
+								 intensities()
 			{}
 			
 			void Update( ModelRanger* rgr );			
@@ -2862,9 +2806,20 @@ namespace Stg
 	 const std::vector<Sensor>& GetSensors() const
 	 { return sensors; }
 	 
-	 /** returns a vector of range samples from the indicated sensor
-		  (defaults to zero) */
+	 /** returns a const reference to the vector of range samples from
+		  the indicated sensor (defaults to zero) */
 	 const std::vector<meters_t>& GetRanges( unsigned int sensor=0) const 
+	 { 
+		if( sensor < sensors.size() )
+		  return sensors[sensor].ranges;
+		
+		PRINT_ERR1( "invalid sensor index specified (%d)", sensor );
+		exit(-1);
+	 }
+
+	 /** returns a mutable reference to the vector of range samples from
+		  the indicated sensor (defaults to zero). Mutating the range data in place allows controllers to act as filters. */
+	 std::vector<meters_t>& GetRangesMutable( unsigned int sensor=0) 
 	 { 
 		if( sensor < sensors.size() )
 		  return sensors[sensor].ranges;

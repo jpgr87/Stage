@@ -105,6 +105,7 @@ class InterfaceModel
 		  const std::string& type );
 
   virtual ~InterfaceModel( void ){ Unsubscribe(); };
+<<<<<<< .merge_file_2l9Fxx
 
   virtual void Subscribe( void );
   virtual void Unsubscribe( void );
@@ -112,6 +113,15 @@ class InterfaceModel
  protected:
   Stg::Model* mod;
 
+=======
+
+  virtual void Subscribe( void );
+  virtual void Unsubscribe( void );
+
+ protected:
+  Stg::Model* mod;
+
+>>>>>>> .merge_file_A6t6Kw
  private:
   bool subscribed;
 };
