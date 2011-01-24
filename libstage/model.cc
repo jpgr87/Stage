@@ -1031,8 +1031,9 @@ void Model::Redraw( void )
 
 Model* Model::GetUnusedModelOfType( const std::string& type )
 {
-  //printf( "searching for type %d in model %s type %d\n", type, token, this->type );
-  
+  printf( "searching for type %s in model %s type %s\n", type.c_str(), token.c_str(), this->type.c_str() );
+  printf( "powerpack is %d\n", power_pack==0);
+
   if( (this->type == type) && (!this->used ) )
     {
       this->used = true;
