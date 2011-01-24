@@ -9,7 +9,7 @@ set( stagepluginSrcs
 	     p_actarray.cc
 	     p_blobfinder.cc
 	     p_bumper.cc
-		   p_gripper.cc
+	     p_gripper.cc
 	     p_simulation.cc
 #	     p_map.cc
 	     p_fiducial.cc
