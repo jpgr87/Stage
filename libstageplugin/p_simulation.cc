@@ -188,7 +188,7 @@ int InterfaceSimulation::ProcessMessage(QueuePointer &resp_queue,
 			reply.pose.px = pose.x;
 			reply.pose.py = pose.y;
 			reply.pose.pa = pose.a;
-
+			
 			this->driver->Publish( this->addr, resp_queue,
 					PLAYER_MSGTYPE_RESP_ACK,
 					PLAYER_SIMULATION_REQ_GET_POSE2D,
@@ -207,6 +207,7 @@ int InterfaceSimulation::ProcessMessage(QueuePointer &resp_queue,
 			PLAYER_SIMULATION_REQ_SET_POSE2D,
 			this->addr))
 	{
+    printf("p_simulation:  Got a request for 2D pose\n");
 		player_simulation_pose2d_req_t* req =
 				(player_simulation_pose2d_req_t*)data;
 

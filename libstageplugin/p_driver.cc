@@ -499,20 +499,26 @@ Interface* StgDriver::LookupDevice( player_devaddr_t addr )
 // subscribe to a device
 int StgDriver::Subscribe(QueuePointer &queue,player_devaddr_t addr)
 {
+  printf("StgDriver::Subscribe\n");
   if( addr.interf == PLAYER_SIMULATION_CODE )
-    return 0; // ok
+  {
+    printf("StgDriver::Subscribe: Something's subscribing to the simulation\n");
+    return 1; // ok
+  }
 
   Interface* device = this->LookupDevice( addr );
 
   if( device )
     {
-	  device->Subscribe();
+  	  device->Subscribe();
       device->Subscribe(queue);
-      return Driver::Subscribe(addr);
+      puts("Found device");
+      int result = this->Driver::Subscribe(addr);
+      return result;
     }
 
   puts( "failed to find a device" );
-  return 1; // error
+  return -1; // error
 }
 
 
@@ -520,18 +526,18 @@ int StgDriver::Subscribe(QueuePointer &queue,player_devaddr_t addr)
 int StgDriver::Unsubscribe(QueuePointer &queue,player_devaddr_t addr)
 {
   if( addr.interf == PLAYER_SIMULATION_CODE )
-    return 0; // ok
+    return 1; // ok
 
   Interface* device = this->LookupDevice( addr );
 
   if( device )
     {
-	  device->Unsubscribe();
+	    device->Unsubscribe();
       device->Unsubscribe(queue);
       return Driver::Unsubscribe(addr);
     }
   else
-    return 1; // error
+    return -1; // error
 }
 
 StgDriver::~StgDriver()
@@ -565,6 +571,7 @@ StgDriver::ProcessMessage(QueuePointer &resp_queue,
 			  player_msghdr * hdr,
 			  void * data)
 {
+  printf("StgDriver::ProcessMessage\n");
   // find the right interface to handle this config
   Interface* in = this->LookupDevice( hdr->addr );
   if( in )
@@ -583,8 +590,8 @@ StgDriver::ProcessMessage(QueuePointer &resp_queue,
 
 void StgDriver::Update(void)
 {
-  Driver::ProcessMessages();
-
+  //printf("StgDriver::Update\n");
+  ProcessMessages();
 	FOR_EACH( it, this->devices )
 		{		
 			Interface* interface = *it;
@@ -619,5 +626,15 @@ void StgDriver::Update(void)
 				}
 		}
 }
-
+/*
+void StgDriver::Main(void)
+{
+	for(;;)
+	{
+		pthread_testcancel();
+		ProcessMessages();
+		this->UpdateDrivers();
+	}
+}
+*/
 
