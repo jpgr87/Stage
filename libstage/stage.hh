@@ -2641,9 +2641,6 @@ namespace Stg
 	 void CommandDown() { SetCommand( CMD_DOWN ); }
   };
 
-
-
-
   // BUMPER MODEL --------------------------------------------------------
 
      typedef struct

@@ -61,13 +61,8 @@ int  InterfaceMap::HandleMsgReqInfo( QueuePointer & resp_queue,
 
   
   // create and render a map for this model
-<<<<<<< HEAD
   Stg::Geom geom;
   geom = this->mod->GetGeom();
-=======
-  Geom geom;
-  model_get_geom( this->mod, &geom );
->>>>>>> upstream
   
   
   double mres = this->mod->GetMapResolution();
@@ -90,10 +85,6 @@ int  InterfaceMap::HandleMsgReqInfo( QueuePointer & resp_queue,
   // origin of map center in global coords
   Stg::Pose global;
   memcpy( &global, &geom.pose, sizeof(global)); 
-<<<<<<< HEAD
-=======
-  model_local_to_global( this->mod, &global );
->>>>>>> upstream
  
   global =  this->mod->LocalToGlobal( &geom.pose );
 
@@ -163,13 +154,8 @@ int InterfaceMap::HandleMsgReqData( QueuePointer & resp_queue,
 {
   // printf( "device %s received map data request\n", this->mod->token );
   
-<<<<<<< HEAD
   Stg::Geom geom;
   geom = this->mod->GetGeom( );
-=======
-  Geom geom;
-  model_get_geom( this->mod, &geom );
->>>>>>> upstream
   
   double mres = this->mod->GetMapResolution();
   
@@ -209,7 +195,7 @@ int InterfaceMap::HandleMsgReqData( QueuePointer & resp_queue,
 	{
 	  point_t* pt1 = &g_array_index( p->points, point_t, l ); 
 	  point_t* pt2 = &g_array_index( p->points, point_t, (l+1) % line_count );	   
-	  
+
 	  render_line( mapresp->data, 
 		       mapresp->width, mapresp->height,
 		       (int)((pt1->x+geom.size.x/2.0) / mres) -oi, 
@@ -278,3 +264,4 @@ int InterfaceMap::ProcessMessage(QueuePointer & resp_queue,
 	       hdr->type, hdr->subtype );
   return -1;
 }
+

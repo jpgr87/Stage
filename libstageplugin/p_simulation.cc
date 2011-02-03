@@ -118,6 +118,7 @@ InterfaceSimulation::InterfaceSimulation( player_devaddr_t addr,
 	// if the initial size is to large this crashes on some systems
 	StgDriver::world = ( StgDriver::usegui ? new WorldGui( 400, 300, worldfile_name ) : new World(worldfile_name));
 	assert(StgDriver::world);
+
 	puts("");
 
 	StgDriver::world->Load( fullname );

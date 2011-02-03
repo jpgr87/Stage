@@ -594,7 +594,6 @@ void StgDriver::Update(void)
 			switch( interface->addr.interf )
 				{
 				case PLAYER_SIMULATION_CODE:
-					// one round of FLTK's update loop.
 					if (StgDriver::usegui)
 						Fl::wait();
 					else

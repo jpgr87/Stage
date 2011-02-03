@@ -42,15 +42,10 @@ ENDIF (NOT PROJECT_OS_WIN AND NOT PROJECT_OS_SOLARIS)
 #####################################
 # Build type cflags
 SET (CMAKE_CXX_FLAGS_RELEASE " -O2 -DNDEBUG ${WALL} " CACHE INTERNAL "C Flags for release" FORCE)
-SET (OPTIMIZE "-O2")
-SET (CMAKE_CXX_FLAGS_RELEASE " ${OPTIMIZE} -DNDEBUG ${WALL} " CACHE INTERNAL "C Flags for release" FORCE)
-<<<<<<< .merge_file_i6byOm
-=======
-SET (CMAKE_CXX_FLAGS_DEBUG "-ggdb  ${WALL} " CACHE INTERNAL "C Flags for debug" FORCE)
-SET (CMAKE_CXX_FLAGS_PROFILE "  -ggdb -pg ${WALL} " CACHE INTERNAL "C Flags for profile" FORCE)
+SET (CMAKE_CXX_FLAGS_DEBUG " -ggdb  ${WALL} " CACHE INTERNAL "C Flags for debug" FORCE)
+SET (CMAKE_CXX_FLAGS_PROFILE " -O2 -ggdb -pg ${WALL} " CACHE INTERNAL "C Flags for profile" FORCE)
 
 #####################################
->>>>>>> .merge_file_RtDVRo
 # Set the default build type
 IF (NOT CMAKE_BUILD_TYPE)
   SET (CMAKE_BUILD_TYPE "release" CACHE STRING 
