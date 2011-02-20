@@ -278,12 +278,8 @@ void PlayerGraphics2dVis::RenderItem(Message & item) {
 		glEnd();
 	}
 		break;
-<<<<<<< .merge_file_ABe7fz
 // Draw Multiline is new in Player 3.1, this ifdef allows Stage to build against older versions of Player
 #if defined PLAYER_GRAPHICS2D_CMD_MULTILINE
-=======
-
->>>>>>> .merge_file_kk3uew
         case PLAYER_GRAPHICS2D_CMD_MULTILINE: {
                 player_graphics2d_cmd_multiline_t
                                 & data =
@@ -296,14 +292,7 @@ void PlayerGraphics2dVis::RenderItem(Message & item) {
         }
                 break;
 
-<<<<<<< .merge_file_ABe7fz
 #endif
-=======
-
->>>>>>> .merge_file_kk3uew
-
-
-
 
 	case PLAYER_GRAPHICS2D_CMD_POLYGON: {
 		player_graphics2d_cmd_polygon_t
