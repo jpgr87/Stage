@@ -37,6 +37,8 @@ class StgDriver : public Driver
   /// check for new commands and configs
   virtual void Update();
 
+//  virtual void Main();
+
   /// all player devices share the same Stage world (for now)
   static Stg::World* world;
   static bool usegui;

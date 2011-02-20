@@ -15,6 +15,8 @@ resolution 0.02
 
 threads 1
 
+
+
 # configure the GUI window
 window
 (
@@ -38,6 +40,7 @@ floorplan
 
 pioneer2dx
 (		  
+  debug 9
   # can refer to the robot by this name
   name "r0"
   pose [ -6.432 -5.895 0 45.000 ] 
@@ -49,6 +52,7 @@ pioneer2dx
   # you probably should comment this out when using simple.cfg with Player
   ctrl "wander"
   watts 10
+
   # report error-free position in world coordinates
   localization "gps"
   localization_origin [ 0 0 0 0 ]

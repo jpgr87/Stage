@@ -175,9 +175,9 @@ int InterfacePosition::ProcessMessage(QueuePointer &resp_queue,
 	  mod->est_pose.a = req->pose.pa;
 
       PRINT_DEBUG3( "set odometry to (%.2f,%.2f,%.2f)",
-                    pose.x,
-                    pose.y,
-                    pose.a );
+                    req->pose.px,
+                    req->pose.py,
+                    req->pose.pa );
 
       this->driver->Publish( this->addr, resp_queue, 
                              PLAYER_MSGTYPE_RESP_ACK, 
