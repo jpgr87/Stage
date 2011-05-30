@@ -2999,8 +2999,11 @@ namespace Stg
     ///change the pitch
     void setPitch( float pitch ) { _pitch_offset = pitch; _valid_vertexbuf_cache = false; }
 	
-    ///change the yaw
-    void setYaw( float yaw ) { _yaw_offset = yaw; _valid_vertexbuf_cache = false; }
+	 ///change the yaw
+	 void setYaw( float yaw ) { _yaw_offset = yaw; _valid_vertexbuf_cache = false; }
+	 
+ private:
+   void ClearBuffers(void);
   };
 
   // POSITION MODEL --------------------------------------------------------
