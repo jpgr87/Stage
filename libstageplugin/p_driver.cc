@@ -135,7 +135,22 @@ More examples can be found in the Stage source tree, in directory
 @par Provides
 
 The stage plugin driver provides the following device interfaces:
-
+ - actarray
+ - blobfinder
+ - bumper
+ - camera
+ - fiducial
+ - gps
+ - graphics2d
+ - graphics3d
+ - gripper
+ - localize
+ - position2d
+ - power
+ - ranger
+ - simulation
+ - speech
+ - wifi
 */
 
 // TODO - configs I should implement
@@ -376,8 +391,6 @@ StgDriver::StgDriver(ConfigFile* cf, int section)
 		ifsrc = new InterfaceGraphics3d( player_addr,  this, cf, section );
 		break;
 
-
-
 // 	case PLAYER_LOCALIZE_CODE:
 // 	  ifsrc = new InterfaceLocalize( player_addr,  this, cf, section );
 // 	  break;
@@ -402,9 +415,9 @@ StgDriver::StgDriver(ConfigFile* cf, int section)
 //  	  ifsrc = new InterfacePtz( player_addr,  this, cf, section );
 //  	  break;
 
-// 	case PLAYER_BUMPER_CODE:
-// 	  ifsrc = new InterfaceBumper( player_addr,  this, cf, section );
-// 	  break;
+ 	case PLAYER_BUMPER_CODE:
+ 	  ifsrc = new InterfaceBumper( player_addr,  this, cf, section );
+ 	  break;
 
 
 	default:
