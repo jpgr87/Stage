@@ -8,6 +8,7 @@ set( stageSrcs
 	blockgroup.cc
 	camera.cc
 	color.cc
+	communication.cc
 	file_manager.cc
 	file_manager.hh
 	gl.cc
@@ -17,7 +18,7 @@ set( stageSrcs
 	model_blinkenlight.cc
 	model_blobfinder.cc
 	model_bumper.cc
-    model_callbacks.cc
+	model_callbacks.cc
 	model_camera.cc
 	model_draw.cc
 	model_fiducial.cc
@@ -25,6 +26,7 @@ set( stageSrcs
 	model_lightindicator.cc
 	model_position.cc
 	model_ranger.cc
+	model_wifi.cc
 	option.cc
 	powerpack.cc
 	region.cc
@@ -67,6 +69,7 @@ target_link_libraries( stage
                        ${JPEG_LIBRARIES} 
                        ${PNG_LIBRARIES}
                        ${FLTK_LIBRARIES}
+                       ${boostRandomLib}
 )
 
 set( stagebinarySrcs main.cc )

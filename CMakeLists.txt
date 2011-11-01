@@ -67,11 +67,6 @@ ENABLE_TESTING()
 
 SET(RGBFILE ${CMAKE_INSTALL_PREFIX}/share/stage/rgb.txt )
 
-# Create the config.h file
-# config.h belongs with the source (and not in CMAKE_CURRENT_BINARY_DIR as in Brian's original version)
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in 
-					${CMAKE_CURRENT_SOURCE_DIR}/config.h @ONLY)
-
 message( STATUS "Checking for libtool" )
 find_path( LTDL_INCLUDE_DIR ltdl.h DOC "Libtool include dir" )
 find_library( LTDL_LIB ltdl DOC "Libtool lib" )
@@ -134,10 +129,21 @@ ELSE( PLAYER_FOUND )
   MESSAGE(STATUS ${INDENT} "Player not detected. If Player is installed but not detected, check your PKG_CONFIG_PATH." )
 ENDIF( PLAYER_FOUND )
 
+# Search for boost randomlib
+find_package(Boost 1.36.0 COMPONENTS random)
+IF (Boost_FOUND)
+  MESSAGE(STATUS ${INDENT} "Using Boost random for wifi")
+  set(HAVE_BOOST_RANDOM "true")
+ENDIF(Boost_FOUND)
+
 # Create the pkgconfig file
 CONFIGURE_FILE (${CMAKE_CURRENT_SOURCE_DIR}/stage.pc.in ${CMAKE_CURRENT_BINARY_DIR}/stage.pc @ONLY)
 INSTALL (FILES ${CMAKE_CURRENT_BINARY_DIR}/stage.pc DESTINATION ${PROJECT_LIB_DIR}/pkgconfig/)
 
+# Create the config.h file
+# config.h belongs with the source (and not in CMAKE_CURRENT_BINARY_DIR as in Brian's original version)
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/config.h.in 
+					${CMAKE_CURRENT_SOURCE_DIR}/config.h @ONLY)
 MESSAGE( STATUS "Installation path CMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_PREFIX}" )
 
 # all targets need these include directories
