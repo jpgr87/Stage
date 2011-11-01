@@ -8,6 +8,7 @@
 #define PLUGIN_PATH "@CMAKE_INSTALL_PREFIX@/@PROJECT_PLUGIN_DIR@"
 
 #cmakedefine BUILD_GUI
+#cmakedefine HAVE_BOOST_RANDOM
 
 #endif
 
