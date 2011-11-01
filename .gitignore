@@ -1,6 +1,7 @@
 build
 config.h
 *.swp
+*~
 examples/ctrl/#wander.cc#
 libstage/#block.cc#
 libstage/#model_camera.cc#
