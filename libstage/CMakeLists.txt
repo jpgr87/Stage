@@ -16,7 +16,8 @@ set( stageSrcs
 	model_actuator.cc
 	model_blinkenlight.cc
 	model_blobfinder.cc
-	model_callbacks.cc
+	model_bumper.cc
+    model_callbacks.cc
 	model_camera.cc
 	model_draw.cc
 	model_fiducial.cc
