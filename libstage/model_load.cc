@@ -100,7 +100,7 @@ void Model::Load()
   
   if( wf->PropertyExists( wf_entity, "velocity" ))
     SetVelocity( GetVelocity().Load( wf, wf_entity, "velocity" ));
-  
+
   if( wf->PropertyExists( wf_entity, "color" ))
     {      
       Color col( 1,0,0 ); // red;
@@ -115,22 +115,7 @@ void Model::Load()
       this->SetColor( col );
     }        
   
-  if( wf->PropertyExists( wf_entity, "color_rgba" ))
-    {      
-      if (wf->GetProperty(wf_entity,"color_rgba")->values.size() < 4)
-	{
-	  PRINT_ERR1( "model %s color_rgba requires 4 values\n", Token() );
-	}
-      else
-	{
-	  double red   = wf->ReadTupleFloat( wf_entity, "color_rgba", 0, 0 );
-	  double green = wf->ReadTupleFloat( wf_entity, "color_rgba", 1, 0 );
-	  double blue  = wf->ReadTupleFloat( wf_entity, "color_rgba", 2, 0 );
-	  double alpha = wf->ReadTupleFloat( wf_entity, "color_rgba", 3, 1 );
-
-	  this->SetColor( Color( red, green, blue, alpha ));
-	}  
-    }
+  this->SetColor( GetColor().Load( wf, wf_entity ) );
   
   if( wf->ReadInt( wf_entity, "noblocks", 0 ) )
     {

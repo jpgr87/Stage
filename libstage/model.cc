@@ -173,129 +173,46 @@ std::map<std::string, creator_t> Model::name_map;
 //static const members
 static const double DEFAULT_FRICTION = 0.0;
 
+
 Bounds& Bounds::Load( Worldfile* wf, const int section, const char* keyword )
 {
-  if( CProperty* prop = wf->GetProperty( section, keyword ) )	
-    {
-      if( prop->values.size() != 2 )
-	{
-	  puts( "" ); // newline
-	  PRINT_ERR1( "Loading 1D bounds. Need a vector of length 2: found %d.\n", 
-		      (int)prop->values.size() ); 
-	  exit(-1);
-	}
-			
-      min = atof( wf->GetPropertyValue( prop, 0 )) * wf->unit_length;
-      max = atof( wf->GetPropertyValue( prop, 1 )) * wf->unit_length;
-    }
-
+  wf->ReadTuple( section, keyword, 0, 2, "ll", &min, &max );
   return *this;
 }
 
-bool Color::Load( Worldfile* wf, const int section )
+double Bounds::Constrain( double value )
 {
-  if( wf->PropertyExists( section, "color" ))
-    {      
-      const std::string& colorstr = wf->ReadString( section, "color", "" );
-      if( colorstr != "" )
-	{
-	  if( colorstr == "random" )
-	    {
-	      r = drand48();
-	      g = drand48();
-	      b = drand48();
-	      a = 1.0;
-	    }
-	  else
-	    {
-	      Color c = Color( colorstr );
-	      r = c.r;
-	      g = c.g;
-	      b = c.b;
-	      a = c.a;
-	    }
-	}
-      return true;
-    }        
-	
-  if( wf->PropertyExists( section, "color_rgba" ))
-    {      
-      if (wf->GetProperty(section,"color_rgba")->values.size() < 4)
-	{
-	  PRINT_ERR1( "color_rgba requires 4 values, found %d\n", 
-		      (int)wf->GetProperty(section,"color_rgba")->values.size() );
-	  exit(-1);
-	}
-      else
-	{
-	  r = wf->ReadTupleFloat( section, "color_rgba", 0, r );
-	  g = wf->ReadTupleFloat( section, "color_rgba", 1, g );
-	  b = wf->ReadTupleFloat( section, "color_rgba", 2, b );
-	  a = wf->ReadTupleFloat( section, "color_rgba", 3, a );
-	}  
-			
-      return true;
-    }
-	
-  return false;
+  return Stg::constrain( value, min, max );
 }
 
 Stg::Size& Stg::Size::Load( Worldfile* wf, const int section, const char* keyword )
 {
-  if( CProperty* prop = wf->GetProperty( section, keyword ) )	
-    {
-      if( prop->values.size() != 3 )
-	{
-	  puts( "" ); // newline
-	  PRINT_ERR1( "Loading size. Need a vector of length 3: found %d.\n", 
-		      (int)prop->values.size() ); 
-	  exit(-1);
-	}
-			
-      x = atof( wf->GetPropertyValue( prop, 0 )) * wf->unit_length;
-      y = atof( wf->GetPropertyValue( prop, 1 )) * wf->unit_length;
-      z = atof( wf->GetPropertyValue( prop, 2 )) * wf->unit_length;
-    }
-
+  wf->ReadTuple( section, keyword, 0, 3, "lll", &x, &y, &z );
   return *this;
 }
 
 void Stg::Size::Save( Worldfile* wf, int section, const char* keyword ) const
 {
-  wf->WriteTupleLength( section, keyword, 0, x );
-  wf->WriteTupleLength( section, keyword, 1, y );
-  wf->WriteTupleLength( section, keyword, 2, z );
+  double s = wf->unit_length;
+  wf->WriteTupleFloat( section, keyword, 0, x/s );
+  wf->WriteTupleFloat( section, keyword, 1, y/s) ;
+  wf->WriteTupleFloat( section, keyword, 2, z/s );
 }
 
 Pose& Pose::Load( Worldfile* wf, const int section, const char* keyword )
 {
-  CProperty* prop = wf->GetProperty( section, keyword );	
-  
-  if( prop )
-    {
-      if( prop->values.size() != 4 )
-	{
-	  puts( "" ); // newline
-	  PRINT_ERR1( "Loading pose. Need a vector of length 4: found %d.\n", 
-		      (int)prop->values.size() ); 
-	  exit(-1);
-	}
-      
-      x = atof( wf->GetPropertyValue( prop, 0 )) * wf->unit_length;
-      y = atof( wf->GetPropertyValue( prop, 1 )) * wf->unit_length;
-      z = atof( wf->GetPropertyValue( prop, 2 )) * wf->unit_length;
-      a = atof( wf->GetPropertyValue( prop, 3 )) * wf->unit_angle;
-    }
-  
+  wf->ReadTuple( section, keyword, 0, 4, "llla", &x, &y, &z, &a );
   return *this;
 }
 
 void Pose::Save( Worldfile* wf, const int section, const char* keyword )
 {
-  wf->WriteTupleLength( section, keyword, 0, x );
-  wf->WriteTupleLength( section, keyword, 1, y );
-  wf->WriteTupleLength( section, keyword, 2, z );
-  wf->WriteTupleAngle(  section, keyword, 3, a );
+  double s = wf->unit_length;
+  double t = wf->unit_angle;
+  wf->WriteTupleFloat( section, keyword, 0, x/s );
+  wf->WriteTupleFloat( section, keyword, 1, y/s );
+  wf->WriteTupleFloat( section, keyword, 1, z/s );
+  wf->WriteTupleFloat( section, keyword, 3, a/t );
 }
 
 Model::Visibility::Visibility() : 
@@ -779,12 +696,12 @@ void Model::Unsubscribe( void )
 }
 
 
-void pose_invert( Pose* pose )
-{
-  pose->x = -pose->x;
-  pose->y = -pose->y;
-  // pose->a = pose->a;
-}
+// void pose_invert( Pose* pose )
+// {
+//   pose->x = -pose->x;
+//   pose->y = -pose->y;
+//   // pose->a = pose->a;
+// }
 
 void Model::Print( char* prefix ) const
 {
@@ -989,6 +906,12 @@ void Model::Move( void )
 
   // convert usec to sec
   const double interval( (double)world->sim_interval / 1e6 );
+
+  // find the change in velcity due to our acceleration vector
+  // velocity.x *= 1.0 + acceleration.x * interval;
+  //velocity.y *= 1.0 + acceleration.y * interval;
+  //velocity.z *= 1.0 + acceleration.z * interval;
+  //velocity.a *= 1.0 + acceleration.a * interval;
   
   // find the change of pose due to our velocity vector
   const Pose p( velocity.x * interval,

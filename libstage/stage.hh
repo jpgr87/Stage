@@ -204,9 +204,9 @@ namespace Stg
   class Color
   {
   public:
-    float r,g,b,a;
+    double r,g,b,a;
 	
-    Color( float r, float g, float b, float a=1.0 );
+    Color( double r, double g, double b, double a=1.0 );
 	
     /** Look up the color in the X11-style database. If the color is
 	not found in the database, a cheerful red color will be used
@@ -223,7 +223,7 @@ namespace Stg
     /** convenient constants */
     static const Color blue, red, green, yellow, magenta, cyan;
 
-    bool Load( Worldfile* wf, int entity );
+    const Color& Load( Worldfile* wf, int entity );
   };
   
   /** specify a rectangular size */
@@ -358,10 +358,10 @@ namespace Stg
 	@param z velocity vector component along Z axis (vertical speed), in meters per second.
 	@param a rotational velocity around Z axis (yaw), in radians per second.
     */
-    Velocity( meters_t x, 
-	      meters_t y, 
-	      meters_t z,
-	      radians_t a ) :
+    Velocity( double x, 
+	      double y, 
+	      double z,
+	      double a ) :
       Pose( x, y, z, a )
     { /*empty*/ }
     
@@ -370,7 +370,7 @@ namespace Stg
     
     /** Print velocity in human-readable format on stdout, with a
 	prefix string 
-		  
+	
 	@param prefix Character string to prepend to output, or NULL.
     */
     
@@ -384,12 +384,13 @@ namespace Stg
     {
       if( prefix )
 	printf( "%s", prefix );
-		
+      
       printf( "velocity [x:%.3f y:%.3f z:%3.f a:%.3f]\n",
 	      x,y,z,a );		
     }	 
   };
   
+ 
   /** Specify an object's basic geometry: position and rectangular
       size.  */
   class Geom
@@ -442,6 +443,9 @@ namespace Stg
     Bounds( double min, double max ) : min(min), max(max) { /* empty*/  }
 
     Bounds& Load( Worldfile* wf, int section, const char* keyword );
+
+    // returns value, but no smaller than min and no larger than max.
+    double Constrain( double value );
   };
     
   /** Define a three-dimensional bounding box, initialized to zero */
@@ -2043,7 +2047,7 @@ namespace Stg
     unsigned int event_queue_num; 
     bool used;   ///< TRUE iff this model has been returned by GetUnusedModelOfType()  
     Velocity velocity;
-		
+	
     /** respond to velocity state by changing position. Initially
 	false, set to true by subclass, worldfile, or explcicit call
 	to Model::VelocityEnable(). */
@@ -2381,7 +2385,7 @@ namespace Stg
 	
     /** set a model's velocity in its parent's coordinate system */
     void SetVelocity(  const Velocity& vel );
-	
+
     /** Enable update of model pose according to velocity state */
     void VelocityEnable();
 
@@ -2892,57 +2896,10 @@ namespace Stg
     /** returns a const reference to a vector of range and reflectance samples */
     const std::vector<Sensor>& GetSensors() const
     { return sensors; }
-	 
-    /** returns a const reference to the vector of range samples from
-	the indicated sensor (defaults to zero) */
-    const std::vector<meters_t>& GetRanges( unsigned int sensor=0) const 
-    { 
-      if( sensor < sensors.size() )
-	return sensors[sensor].ranges;
-		
-      PRINT_ERR1( "invalid sensor index specified (%d)", sensor );
-      exit(-1);
-    }
 
-    /** returns a mutable reference to the vector of range samples from
-	the indicated sensor (defaults to zero). Mutating the range data in place allows controllers to act as filters. */
-    std::vector<meters_t>& GetRangesMutable( unsigned int sensor=0) 
-    { 
-      if( sensor < sensors.size() )
-	return sensors[sensor].ranges;
-		
-      PRINT_ERR1( "invalid sensor index specified (%d)", sensor );
-      exit(-1);
-    }
-		
-    /** returns a pointer to an array of ranges, and fills in the
-	argument with the array-length (C-style). */
-    meters_t* GetRangesArr( unsigned int sensor, uint32_t* count )
-    {
-      assert(count);
-      *count = sensors[sensor].ranges.size();
-      return &sensors[sensor].ranges[0];
-    }
-
-    /** returns a pointer to an array of intensities, and fills in the
-	argument with the array-length (C-style). */
-    meters_t* GetIntensitiesArr( unsigned int sensor, uint32_t* count )
-    {
-      assert(count);
-      *count = sensors[sensor].intensities.size();
-      return &sensors[sensor].intensities[0];
-    }
-		
-    /** returns a vector of intensitye samples from the indicated sensor
-	(defaults to zero) */
-    const std::vector<double>& GetIntensities( unsigned int sensor=0) const 
-    { 
-      if( sensor < sensors.size() )
-	return sensors[sensor].intensities;
-		
-      PRINT_ERR1( "invalid sensor index specified (%d)", sensor );
-      exit(-1);
-    }
+    /** returns a mutable reference to a vector of range and reflectance samples */
+    std::vector<Sensor>& GetSensorsMutable() 
+    { return sensors; }
 	 
     void LoadSensor( Worldfile* wf, int entity );
 		
@@ -3070,7 +3027,8 @@ namespace Stg
   public:
     /** Define a position  control method */
     typedef enum
-      { CONTROL_VELOCITY, 
+      { CONTROL_ACCELERATION,
+	CONTROL_VELOCITY, 
 	CONTROL_POSITION 
       } ControlMode;
 	 
@@ -3094,7 +3052,13 @@ namespace Stg
     LocalizationMode localization_mode; ///< global or local mode
     Velocity integration_error; ///< errors to apply in simple odometry model
     double wheelbase;
-	 
+    
+    /** Set the min and max acceleration in all 4 DOF */
+    Bounds acceleration_bounds[4];
+
+    /** Set the min and max velocity in all 4 DOF */
+    Bounds velocity_bounds[4];
+
   public:
     // constructor
     ModelPosition( World* world,
@@ -3158,6 +3122,11 @@ namespace Stg
 	the goal pose */
     void GoTo( double x, double y, double a );
     void GoTo( Pose pose );
+    
+    /** Sets the control mode to CONTROL_ACCELERATION and sets the
+	current accelerations to x, y (meters per second squared) and
+	a (radians per second squared) */
+    void SetAcceleration( double x, double y, double a );
 
     // localization state
     Pose est_pose; ///< position estimate in local coordinates
@@ -3185,7 +3154,7 @@ namespace Stg
       } ActuatorType;
   
   private:
-    double goal; //< the current velocity or pose to reach, depending on the value of control_mode
+    double goal; //< the current velocity or pose to reach depending on the value of control_mode
     double pos;
     double max_speed;
     double min_position;
