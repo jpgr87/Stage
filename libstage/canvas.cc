@@ -910,8 +910,15 @@ void Canvas::renderFrame()
     }
   
   if( showFlags ) 
-    FOR_EACH( it, models_sorted )
-      (*it)->DrawFlagList();
+    {
+      glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
+      glBegin( GL_TRIANGLES );
+
+      FOR_EACH( it, models_sorted )
+	(*it)->DrawFlagList();
+
+      glEnd();
+    }
 
   if( showTrailArrows )
     FOR_EACH( it, models_sorted )
@@ -1100,7 +1107,7 @@ void Canvas::Screenshot()
   
   static uint32_t count = 0;		 
   char filename[64];
-  snprintf( filename, 63, "stage-%d.png", count++ );
+  snprintf( filename, 63, "stage-%06d.png", count++ );
   
   FILE *fp = fopen( filename, "wb" );
   if( fp == NULL ) 

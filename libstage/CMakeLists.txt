@@ -22,10 +22,8 @@ set( stageSrcs
 	model_camera.cc
 	model_draw.cc
 	model_fiducial.cc
-	model_getset.cc
 	model_gripper.cc
 	model_lightindicator.cc
-	model_load.cc
 	model_position.cc
 	model_ranger.cc
 	model_wifi.cc
@@ -38,13 +36,16 @@ set( stageSrcs
 	typetable.cc		
 	world.cc			
 	worldfile.cc		
-  canvas.cc 
-  options_dlg.cc
-  options_dlg.hh
-  vis_strip.cc			
-  worldgui.cc 
-  ancestor.cc
+	canvas.cc 
+	options_dlg.cc
+	options_dlg.hh
+	vis_strip.cc			
+	worldgui.cc 
+	ancestor.cc
 )
+
+#	model_getset.cc
+#	model_load.cc
 
 #set_source_files_properties( ${stageSrcs} PROPERTIES COMPILE_FLAGS" )
  

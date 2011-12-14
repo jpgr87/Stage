@@ -275,25 +275,32 @@ void WorldGui::Load( const std::string& filename )
   const int window_section = wf->LookupEntity( "window" );
   
   if( window_section > 0 ) 
-	 {			
-		const int width =  (int)wf->ReadTupleFloat(window_section, "size", 0, w() );
-		const int height = (int)wf->ReadTupleFloat(window_section, "size", 1, h() );
-		size( width,height );
-		size_range( 100, 100 ); // set min size to 100/100, max size to screen size
-		
-		// configure the canvas
-		canvas->Load(  wf, window_section );
-		// warn about unused WF lines
-		wf->WarnUnused();
-  
-		std::string title = PROJECT;
-		if ( wf->filename.size() ) {
-		  // improve the title bar to say "Stage: <worldfile name>"
-		  title += ": ";		
-		  title += wf->filename;
-		}
-		label( title.c_str() );
-	 }
+    {	
+      unsigned int width = w();
+      unsigned int height = h();
+      wf->ReadTuple(window_section, "size", 0, 2, "uu", &width, &height );
+      
+      
+      size( width,height );
+      size_range( 100, 100 ); // set min size to 100/100, max size to screen size
+      
+      // configure the canvas
+      canvas->Load(  wf, window_section );
+      
+      std::string title = PROJECT;
+      if ( wf->filename.size() ) {
+	// improve the title bar to say "Stage: <worldfile name>"
+	title += ": ";		
+	title += wf->filename;
+      }
+      label( title.c_str() );
+
+      FOR_EACH( it, option_table )
+	(*it)->Load( wf, window_section );
+
+      // warn about unused WF lines
+      wf->WarnUnused();
+    }
  
   const usec_t load_end_time = RealTimeNow();
 	
@@ -323,12 +330,14 @@ bool WorldGui::Save( const char* filename )
 	
   if( window_section > 0 ) // section defined
     {
-      wf->WriteTupleFloat( window_section, "size", 0, w() );
-      wf->WriteTupleFloat( window_section, "size", 1, h() );
+      unsigned int width = w();
+      unsigned int height = h();
+      wf->WriteTuple( window_section, "size", 0, 2, "uu", width, height );
 	    
       canvas->Save( wf, window_section );
 	    
-      // TODO - per model visualizations save 
+    FOR_EACH( it, option_table )
+	(*it)->Save( wf, window_section );
     }
 	
 	World::Save( filename );
@@ -430,12 +439,16 @@ void WorldGui::DrawOccupancy() const
 // 	printf( "done\n" );
 
 //  unsigned int layer( updates % 2 );
-
+  
   FOR_EACH( it, superregions )
-	 {
-		it->second->DrawOccupancy(0);
-		it->second->DrawOccupancy(1);
-	 }
+    it->second->DrawOccupancy();
+  
+  // 	 {
+
+  // it->second->DrawOccupancy(0);
+    //    it->second->DrawOccupancy(1);
+
+  //	 }
 }
 
 void WorldGui::DrawVoxels() const
@@ -637,24 +650,24 @@ void WorldGui::viewOptionsCb( OptionsDlg* oDlg, WorldGui* wg )
   //std::sort();// wg->option_table.begin(), wg->option_table.end() );//, sort_option_pointer );
 
   if ( !wg->oDlg ) 
-	 {
-		int x = wg->w()+wg->x() + 10;
-		int y = wg->y();
-		OptionsDlg* oDlg = new OptionsDlg( x,y, 180,250 );
-		oDlg->callback( (Fl_Callback*)optionsDlgCb, wg );
-		
-		oDlg->setOptions( wg->option_table );
-		oDlg->showAllOpt( &wg->canvas->visualizeAll );
-		wg->oDlg = oDlg;
-		oDlg->show();
-	 }
+    {
+      int x = wg->w()+wg->x() + 10;
+      int y = wg->y();
+      OptionsDlg* oDlg = new OptionsDlg( x,y, 180,250 );
+      oDlg->callback( (Fl_Callback*)optionsDlgCb, wg );
+      
+      oDlg->setOptions( wg->option_table );
+      oDlg->showAllOpt( &wg->canvas->visualizeAll );
+      wg->oDlg = oDlg;
+      oDlg->show();
+    }
   else 
-	 {
-		wg->oDlg->hide();
-		delete wg->oDlg;
-		wg->oDlg = NULL;
-	 }
- 
+    {
+      wg->oDlg->hide();
+      delete wg->oDlg;
+      wg->oDlg = NULL;
+    }
+  
 }
 
 void WorldGui::optionsDlgCb( OptionsDlg* oDlg, WorldGui* wg ) 

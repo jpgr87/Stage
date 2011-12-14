@@ -102,13 +102,15 @@ bool World::ltx::operator()(const Model* a, const Model* b) const
 {
   const meters_t ax( a->GetGlobalPose().x );
   const meters_t bx( b->GetGlobalPose().x );  
-  return ( ax == bx ? a < b : ax < bx );
+  // break ties using the pointer value to give a unique ordering
+  return ( ax == bx ? a < b : ax < bx ); 
 }
 bool World::lty::operator()(const Model* a, const Model* b) const
 {
   const meters_t ay( a->GetGlobalPose().y );
   const meters_t by( b->GetGlobalPose().y );  
-  return ( ay == by ? a < b : ay < by );
+  // break ties using the pointer value ro give a unique ordering
+  return ( ay == by ? a < b : ay < by ); 
 }
 
 // static data members
@@ -150,7 +152,6 @@ World::World( const std::string& name,
   ray_list(),  
   sim_time( 0 ),
   superregions(),
-  sr_cached(NULL),
   updates( 0 ),
   wf( NULL ),
   paused( false ),
@@ -201,6 +202,30 @@ void World::DestroySuperRegion( SuperRegion* sr )
 {
   superregions.erase( sr->GetOrigin() );
   delete sr;
+}
+
+void World::Run()
+{
+    // first check wheter there is a single gui world
+    bool found_gui = false;
+    FOR_EACH( world_it, world_set )
+    {
+        found_gui |= (*world_it)->IsGUI();
+    }
+    if(found_gui && (world_set.size() != 1))
+    {
+        PRINT_WARN( "When using the GUI only a single world can be simulated." );
+        exit(-1);      
+    }
+    
+    if(found_gui)
+    {
+        Fl::run();
+    }
+    else
+    {
+        while(!UpdateAll());
+    }
 }
 
 bool World::UpdateAll()
@@ -713,6 +738,7 @@ void World::ClearRays()
   ray_list.clear();
 }
 
+// Perform multiple raytraces evenly spaced over an angular field of view
 void World::Raytrace( const Pose &gpose, // global pose
 		      const meters_t range,
 		      const radians_t fov,
@@ -805,6 +831,9 @@ RaytraceResult World::Raytrace( const Ray& r )
   // Stage spends up to 95% of its time in this loop! It would be
   // neater with more function calls encapsulating things, but even
   // inline calls have a noticeable (2-3%) effect on performance.
+
+  // several useful asserts are commented out so that Stage is not too
+  // slow in debug builds. Add them in if chasing a suspected raytrace bug
   while( n > 0  ) // while we are still not at the ray end
     { 
       SuperRegion* sr( GetSuperRegion(point_int_t(GETSREG(globx),GETSREG(globy))));
@@ -823,7 +852,9 @@ RaytraceResult World::Raytrace( const Ray& r )
 	  int32_t cy( GETCELL(globy) );
 
 	  Cell* c( &reg->cells[ cx + cy * REGIONWIDTH ] );
-	  assert(c); // should be good: we know the region contains objects
+
+	  // this assert makes Stage slow when compiled for debug
+	  //  assert(c); // should be good: we know the region contains objects
 
 	  // while within the bounds of this region and while some ray remains
 	  // we'll tweak the cell pointer directly to move around quickly
@@ -834,7 +865,7 @@ RaytraceResult World::Raytrace( const Ray& r )
 	      FOR_EACH( it, c->blocks[layer] )
 		{	      	      
 		  Block* block( *it );
-		  assert( block );
+		  // assert( block );
 
 		  // skip if not in the right z range
 		  if( r.ztest && 
@@ -1227,8 +1258,7 @@ static int _save_cb( Model* mod, void* dummy )
 bool World::Save( const char *filename )
 {
   ForEachDescendant( _save_cb, NULL );
-
-  return this->wf->Save( filename );
+  return this->wf->Save( filename ? filename : wf->filename );
 }
 
 static int _reload_cb(  Model* mod, void* dummy )
@@ -1243,6 +1273,7 @@ void World::Reload( void )
   ForEachDescendant( _reload_cb, NULL );
 }
 
+// add a block to each cell described by a polygon in world coordinates
 void World::MapPoly( const std::vector<point_int_t>& pts, Block* block, unsigned int layer )
 {
   const size_t pt_count( pts.size() );
@@ -1262,6 +1293,7 @@ void World::MapPoly( const std::vector<point_int_t>& pts, Block* block, unsigned
       const int32_t ay(abs(dy));  
       const int32_t bx(2*ax);	
       const int32_t by(2*ay);	 
+
       int32_t exy(ay-ax); 
       int32_t n(ax+ay);
 			
@@ -1274,9 +1306,7 @@ void World::MapPoly( const std::vector<point_int_t>& pts, Block* block, unsigned
 							 GETSREG(globy)))
 		       ->GetRegion( GETREG(globx), 
 				    GETREG(globy)));										
-	  assert(reg);
-					
-	  //printf( "REGION %p\n", reg );
+	  // assert(reg);
 					
 	  // add all the required cells in this region before looking up
 	  // another region			
@@ -1290,8 +1320,8 @@ void World::MapPoly( const std::vector<point_int_t>& pts, Block* block, unsigned
 					
 	  // while inside the region, manipulate the Cell pointer directly
 	  while( (cx>=0) && (cx<REGIONWIDTH) && 
-		 (cy>=0) && (cy<REGIONWIDTH) && 
-		 n > 0 )
+	  	 (cy>=0) && (cy<REGIONWIDTH) && 
+	  	 n > 0 )
 	    {					
 	      c->AddBlock(block, layer ); 
 							
@@ -1322,34 +1352,21 @@ SuperRegion* World::AddSuperRegion( const point_int_t& sup )
 {
   SuperRegion* sr( CreateSuperRegion( sup ) );
 
-  //printf( "Created super region [%d, %d] %p\n", sup.x, sup.y, sr );
-
-  // the bounds of the world have changed
-  //printf( "lower left (%.2f,%.2f,%.2f)\n", pt.x, pt.y, pt.z );
-	
   // set the lower left corner of the new superregion
   Extend( point3_t( (sup.x << SRBITS) / ppm,
 		    (sup.y << SRBITS) / ppm,
 		    0 ));
-	
+  
   // top right corner of the new superregion
   Extend( point3_t( ((sup.x+1) << SRBITS) / ppm,
 		    ((sup.y+1) << SRBITS) / ppm,
-		    0 ));
-  //printf( "top right (%.2f,%.2f,%.2f)\n", pt.x, pt.y, pt.z );
-  
+		    0 ));  
   return sr;
 }
 
 
 inline SuperRegion* World::GetSuperRegion( const point_int_t& org )
 {
-  // around 99% of the time the SR is the same as last
-  // lookup - cache  gives a 4% overall speed up :)
-	
-  if( sr_cached && sr_cached->GetOrigin() == org )
-    return sr_cached;
-	
   SuperRegion* sr(NULL);
   
   // I despise some STL syntax sometimes...
@@ -1357,8 +1374,6 @@ inline SuperRegion* World::GetSuperRegion( const point_int_t& org )
   
   if( it != superregions.end() )
     sr = it->second;
-  
-  if( sr ) sr_cached = sr;
   
   return sr;
 }
@@ -1371,7 +1386,6 @@ inline SuperRegion* World::GetSuperRegionCreate( const point_int_t& org )
     {
       sr = AddSuperRegion( org );  
       assert( sr ); 
-      sr_cached = sr;
     }
   return sr;
 }
@@ -1401,6 +1415,7 @@ void World::RemovePowerPack( PowerPack* pp )
 /// Register an Option for pickup by the GUI
 void World:: RegisterOption( Option* opt )
 {
+  assert(opt);
   option_table.insert( opt );
 }
 

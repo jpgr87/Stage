@@ -8,11 +8,8 @@
 #include "region.hh"
 using namespace Stg;
 
-// static member
-std::vector<Stg::Cell*> Stg::Region::dead_pool;
-
 Stg::Region::Region() : 
-  cells(NULL), 
+  cells(), 
   count(0),
   superregion(NULL)
 {
@@ -20,8 +17,6 @@ Stg::Region::Region() :
 
 Stg::Region::~Region()
 {
-  if( cells )
-    delete[] cells;
 }
 
 void Stg::Region::AddBlock()
@@ -40,17 +35,7 @@ void Stg::Region::RemoveBlock()
   // if there's nothing in this region, we can garbage collect the
   // cells to keep memory usage under control
   if( count == 0 )
-    {
-      if( cells )
-	{
-	  // stash this on the pool for reuse
-	  dead_pool.push_back(cells);					
-	  //printf( "retiring cells @ %p (pool %u)\n", cells, dead_pool.size() );
-	  cells = NULL;
-	}
-      else
-	PRINT_ERR( "region.count == 0 but cells == NULL" );			
-    }		
+    cells.clear();
 }
 
 SuperRegion::SuperRegion( World* world, point_int_t origin ) 
@@ -81,7 +66,7 @@ void SuperRegion::RemoveBlock()
 }		
 
 
-void SuperRegion::DrawOccupancy( unsigned int layer ) const
+void SuperRegion::DrawOccupancy(void) const
 {
   //printf( "SR origin (%d,%d) this %p\n", origin.x, origin.y, this );
 
@@ -90,7 +75,6 @@ void SuperRegion::DrawOccupancy( unsigned int layer ) const
   glScalef( scale, scale, 1.0 ); // XX TODO - this seems slightly
   glTranslatef( origin.x<<SRBITS, origin.y<<SRBITS,0);
   
-  glEnable( GL_DEPTH_TEST );
   glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
   
   // outline superregion
@@ -101,81 +85,71 @@ void SuperRegion::DrawOccupancy( unsigned int layer ) const
   if( regions )
     {
       const Region* r = &regions[0];
-      char buf[32];
-		
-      switch( layer )
-	{
-	case 0: // moveable 1
-	  glColor3f( 0,1,0 );    
-	  break;
-	case 1: // moveable 2
-	  glTranslatef( 0.05, 0.05, 0);
-	  glColor3f( 0,0,1 );    
-	  break;
-	  // 		  case 2: // fixed 
-	  // 			 glTranslatef( 0.1, 0.1, 0);
-	  // 			 glColor3f( 1,0,0 );    
-	  // 			 break;
-	default:
-	  PRINT_ERR1( "error: wrong layer %d", layer );			 
-	}
-		
+      std::vector<GLfloat> rects(1000);
+ 			  
       for( int y=0; y<SUPERREGIONWIDTH; ++y )
 	for( int x=0; x<SUPERREGIONWIDTH; ++x )
 	  {
 	    if( r->count ) // region contains some occupied cells
-	      {
+	      {					 
+      
 		// outline the region
+		glColor3f(0,1,0);
 		glRecti( x<<RBITS, y<<RBITS, 
 			 (x+1)<<RBITS, (y+1)<<RBITS );
-					 
+		
 		// show how many cells are occupied
-		snprintf( buf, 15, "%lu", r->count );
-		Gl::draw_string( x<<RBITS, y<<RBITS, 0, buf );
-					 
+		//snprintf( buf, 15, "%lu", r->count );
+		//Gl::draw_string( x<<RBITS, y<<RBITS, 0, buf );
+		
 		// draw a rectangle around each occupied cell					 
 		for( int p=0; p<REGIONWIDTH; ++p )
 		  for( int q=0; q<REGIONWIDTH; ++q )
-		    if( r->cells[p+(q*REGIONWIDTH)].blocks[layer].size() )
-		      {					 
-			GLfloat xx = p+(x<<RBITS);
-			GLfloat yy = q+(y<<RBITS);						  
-			glRecti( xx, yy, xx+1, yy+1);
-		      }
-	      }
-	    /*				else if( r->cells ) // empty but used previously 
-					{
-					double left = x << RBITS;
-					double right = (x+1) << RBITS;
-					double bottom = y << RBITS;
-					double top = (y+1) << RBITS;
-					 
-					double d = 3.0;
-					 
-					// draw little corner markers for regions with memory
-					// allocated but no contents
-					glBegin( GL_LINES );
-					glVertex2f( left, bottom );
-					glVertex2f( left+d, bottom );
-					glVertex2f( left, bottom );
-					glVertex2f( left, bottom+d );
-					glVertex2f( left, top );
-					glVertex2f( left+d, top );
-					glVertex2f( left, top );
-					glVertex2f( left, top-d );
-					glVertex2f( right, top );
-					glVertex2f( right-d, top );
-					glVertex2f( right, top );
-					glVertex2f( right, top-d );
-					glVertex2f( right, bottom );
-					glVertex2f( right-d, bottom );
-					glVertex2f( right, bottom );
-					glVertex2f( right, bottom+d );
-					glEnd();
-					}
-	    */
+		    {
+		      const Cell& c = r->cells[p+(q*REGIONWIDTH)];
+
+		      if( c.blocks[0].size() ) // layer 0
+			{					 
+			  const GLfloat xx = p+(x<<RBITS);
+			  const GLfloat yy = q+(y<<RBITS);					
+
+			  rects.push_back( xx );
+			  rects.push_back( yy );
+			  rects.push_back( xx+1 );
+			  rects.push_back( yy );
+			  rects.push_back( xx+1 );
+			  rects.push_back( yy+1 );
+			  rects.push_back( xx );
+			  rects.push_back( yy+1 );
+			}
+		      
+		      if( c.blocks[1].size() ) // layer 1
+		       	{					 
+		       	  const GLfloat xx = p+(x<<RBITS);
+		       	  const GLfloat yy = q+(y<<RBITS);					
+		       	  const double dx = 0.1;
+
+		       	  rects.push_back( xx+dx );
+		       	  rects.push_back( yy+dx );
+		       	  rects.push_back( xx+1-dx );
+		       	  rects.push_back( yy+dx );
+			  rects.push_back( xx+1-dx );
+			  rects.push_back( yy+1-dx );
+			  rects.push_back( xx+dx );
+			  rects.push_back( yy+1-dx );
+			}
+		    }
+
+	      }  
 	    ++r; // next region quickly
-	  }			
+	  }  	
+      
+      if( rects.size() )
+	{
+	  assert( rects.size() % 8 == 0 ); // should be full of squares	  
+	  glVertexPointer( 2, GL_FLOAT, 0, &rects[0] );       
+	  glDrawArrays( GL_QUADS, 0, rects.size()/2 );
+	}
     }
   else
     {  // outline region-collected superregion
@@ -184,46 +158,42 @@ void SuperRegion::DrawOccupancy( unsigned int layer ) const
       glColor3f( 0,0,1 );   
     }
   
-  char buf[32];
-  snprintf( buf, 15, "%lu", count );
-  Gl::draw_string( 1<<SBITS, 1<<SBITS, 0, buf );
+  // char buf[32];
+  // snprintf( buf, 15, "%lu", count );
+  // Gl::draw_string( 1<<SBITS, 1<<SBITS, 0, buf );
   
   glPopMatrix();    
 }
 
-
-static inline void DrawBlock( GLfloat x, GLfloat y, GLfloat zmin, GLfloat zmax )
+static inline const std::vector<GLfloat> DrawBlock( GLfloat x, GLfloat y, GLfloat zmin, GLfloat zmax )
 {
-  glBegin( GL_QUADS );
-  
+  std::vector<GLfloat> v(60);
+
   // TOP
-  glVertex3f( x, y, zmax );
-  glVertex3f( 1+x, y, zmax );
-  glVertex3f( 1+x, 1+y, zmax );
-  glVertex3f( x, 1+y, zmax );
+  v[0]=x;     v[1]=y;     v[2]=zmax;
+  v[3]=1+x;   v[4]=y;     v[5]=zmax;
+  v[6]=1+x;   v[7]=1+y;   v[8]=zmax;
+  v[9]=x;     v[10]=1+y;  v[11]=zmax;
   
   // sides
-  glVertex3f( x, y, zmax );
-  glVertex3f( x, 1+y, zmax );
-  glVertex3f( x, 1+y, zmin );
-  glVertex3f( x, y, zmin );
-  
-  glVertex3f( 1+x, y, zmax );
-  glVertex3f( x, y, zmax );
-  glVertex3f( x, y, zmin );
-  glVertex3f( 1+x, y, zmin );
-  
-  glVertex3f( 1+x, 1+y, zmax );
-  glVertex3f( 1+x, y, zmax );
-  glVertex3f( 1+x, y, zmin );
-  glVertex3f( 1+x, 1+y, zmin );
-  
-  glVertex3f( x, 1+y, zmax );
-  glVertex3f( 1+x, 1+y, zmax );
-  glVertex3f( 1+x, 1+y, zmin );
-  glVertex3f( x, 1+y, zmin );
+  v[12]=x;    v[13]=y;    v[14]=zmax;
+  v[15]=x;    v[16]=1+y;  v[17]=zmax;
+  v[18]=x;    v[19]=1+y;  v[20]=zmin;
+  v[21]=x;    v[22]=y;    v[23]=zmin;
+  v[24]=1+x;  v[25]=y;    v[26]=zmax;
+  v[27]=x;    v[28]=y;    v[29]=zmax;
+  v[30]=x;    v[31]=y;    v[32]=zmin;
+  v[33]=1+x;  v[34]=y;    v[35]=zmin;
+  v[36]=1+x;  v[37]=1+y;  v[38]=zmax;
+  v[39]=1+x;  v[40]=y;    v[41]=zmax;
+  v[42]=1+x;  v[43]=y;    v[44]=zmin;
+  v[45]=1+x;  v[46]=1+y;  v[47]=zmin;
+  v[48]=x;    v[49]=1+y;  v[50]=zmax;
+  v[51]=1+x;  v[52]=1+y;  v[53]=zmax;
+  v[54]=1+x;  v[55]=1+y;  v[56]=zmin;
+  v[57]=x;    v[58]=1+y;  v[59]=zmin;
 
-  glEnd();  
+  return v;
 } 
 
 void SuperRegion::DrawVoxels(unsigned int layer) const
@@ -237,6 +207,9 @@ void SuperRegion::DrawVoxels(unsigned int layer) const
   glEnable( GL_DEPTH_TEST );
   glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );
   
+  std::vector<GLfloat> verts(1000);
+  std::vector<GLfloat> colors(1000);
+
   const Region* r = &regions[0];
   
   for( int y=0; y<SUPERREGIONWIDTH; ++y )
@@ -253,32 +226,41 @@ void SuperRegion::DrawVoxels(unsigned int layer) const
 		  {					 
 		    const GLfloat xx(p+(x<<RBITS));
 		    const GLfloat yy(q+(y<<RBITS));
-						  
+		    
 		    FOR_EACH( it, blocks )
 		      {
 			Block* block = *it;
-			// first draw filled polygons
 			Color c = block->GetColor();
-			glColor4f( c.r, c.g, c.b, 1.0 );
-								
-			glPolygonMode( GL_FRONT_AND_BACK, GL_FILL );
-			glEnable(GL_POLYGON_OFFSET_FILL);
-			// TODO - these numbers need tweaking for
-			// better-looking rendering
-			glPolygonOffset(0.01, 0.1);								
-			DrawBlock( xx, yy, block->global_z.min, block->global_z.max );
-								
-			// draw again in outline
-			glDisable(GL_POLYGON_OFFSET_FILL);								
-			glColor4f( c.r/2.0, c.g/2.0, c.b/2.0, c.a );
-			glPolygonMode( GL_FRONT_AND_BACK, GL_LINE );								
-			DrawBlock( xx, yy, block->global_z.min, block->global_z.max );								
+			
+			const std::vector<GLfloat> v = DrawBlock(  xx, yy, block->global_z.min, block->global_z.max );
+			verts.insert( verts.end(), v.begin(), v.end() );
+			
+			for( unsigned int i=0; i<20; i++ )
+			  {
+			    colors.push_back( c.r );
+			    colors.push_back( c.g );
+			    colors.push_back( c.b );
+			  }
 		      }
 		  }
-	      }
-		  
+	      }		  
 	++r;
       }
+
+  if( verts.size() )
+    {
+      assert( verts.size() % 60 == 0 ); // should be full of blocks, each with 20 3D vertices
+
+      glEnableClientState( GL_COLOR_ARRAY );
+
+      glVertexPointer( 3, GL_FLOAT, 0, &verts[0] );       
+      glColorPointer( 3, GL_FLOAT, 0, &colors[0] );
+
+      glDrawArrays( GL_QUADS, 0, verts.size()/3 );
+
+      glDisableClientState( GL_COLOR_ARRAY );
+    }
+
   glPopMatrix();    
 }
 
