@@ -30,7 +30,7 @@
 
 #include <stdint.h> // for portable int types eg. uint32_t
 #include <stdio.h> // for FILE ops
-
+#include <stdarg.h> // for va_start, va_end
 namespace Stg {
 
   /// Property class

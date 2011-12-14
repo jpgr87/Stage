@@ -149,8 +149,8 @@ void ModelBumper::Load( void )
 	  snprintf(key, sizeof(key), "bpose[%d]", i);
 	  bumpers[i].pose.x = wf->ReadTupleLength( wf_entity, key, 0, 0 );
 	  bumpers[i].pose.y = wf->ReadTupleLength( wf_entity, key, 1, 0 );
-	  bumpers[i].pose.z = 0.0;
-	  bumpers[i].pose.a = wf->ReadTupleAngle( wf_entity, key, 2, 0);
+	  bumpers[i].pose.z = wf->ReadTupleLength( wf_entity, key, 2, 0 );
+	  bumpers[i].pose.a = wf->ReadTupleLength( wf_entity, key, 3, 0 );
 
 	  snprintf(key, sizeof(key), "blength[%d]", i);
 	  bumpers[i].length = wf->ReadLength( wf_entity, key, bumpers[i].length );
