@@ -30,12 +30,16 @@ target_link_libraries( stageplugin
 )
 
 set_source_files_properties( ${stagepluginSrcs} PROPERTIES COMPILE_FLAGS "${FLTK_CFLAGS}" )
-
 # delete the "lib" prefix from the plugin
 SET_TARGET_PROPERTIES( stageplugin PROPERTIES 
                        PREFIX ""
+                     )
+
+if (PROJECT_OS_LINUX)
+  SET_TARGET_PROPERTIES( stageplugin PROPERTIES 
                        LINK_FLAGS "${FLTK_LDFLAGS}"
- )
+                       )
+ENDIF(PROJECT_OS_LINUX)
 
 IF (BUILD_LSPTEST)
 	ADD_SUBDIRECTORY(test)
