@@ -662,6 +662,7 @@ bool World::Update()
   pthread_mutex_unlock( &sync_mutex );		 
   
   // update the position of all position models based on their velocity
+  // while sensor models are running in other threads
   FOR_EACH( it, active_velocity )
     (*it)->Move();
   
@@ -874,12 +875,12 @@ RaytraceResult World::Raytrace( const Ray& r )
 		    continue; 
 									
 		  // test the predicate we were passed
-		  if( (*r.func)( block->mod, (Model*)r.mod, r.arg )) 
+		  if( (*r.func)( &block->group->mod, (Model*)r.mod, r.arg )) 
 		    {
 		      // a hit!
-		      sample.color = block->GetColor();
-		      sample.mod = block->mod;
-											
+		      sample.mod = &block->group->mod;	
+		      sample.color = sample.mod->GetColor();
+										
 		      if( ax > ay ) // faster than the equivalent hypot() call
 			sample.range = fabs((globx-startx) / cosa) / ppm;
 		      else
@@ -1306,7 +1307,7 @@ void World::MapPoly( const std::vector<point_int_t>& pts, Block* block, unsigned
 							 GETSREG(globy)))
 		       ->GetRegion( GETREG(globx), 
 				    GETREG(globy)));										
-	  // assert(reg);
+	  assert(reg);
 					
 	  // add all the required cells in this region before looking up
 	  // another region			

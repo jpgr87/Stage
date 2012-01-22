@@ -248,8 +248,7 @@ Model::Model( World* world,
   mapped(false),
   drawOptions(),
   alwayson(false),
-  blockgroup(),
-  blocks_dl(0),
+  blockgroup(*this),
   boundary(false),
   callbacks(__CB_TYPE_COUNT), // one slot in the vector for each type
   color( 1,0,0 ), // red
@@ -435,18 +434,18 @@ void Model::LoadBlock( Worldfile* wf, int entity )
       has_default_block = false;
     }
   
-  blockgroup.LoadBlock( this, wf, entity );  
+  blockgroup.LoadBlock( wf, entity );  
 }
 
 
-Block* Model::AddBlockRect( meters_t x, 
-			    meters_t y, 
-			    meters_t dx, 
-			    meters_t dy,
-			    meters_t dz )
+void Model::AddBlockRect( meters_t x, 
+			  meters_t y, 
+			  meters_t dx, 
+			  meters_t dy,
+			  meters_t dz )
 {  
   UnMap();
-
+  
   std::vector<point_t> pts(4);
   pts[0].x = x;
   pts[0].y = y;
@@ -457,18 +456,11 @@ Block* Model::AddBlockRect( meters_t x,
   pts[3].x = x;
   pts[3].y = y + dy;
   
-  Block* newblock =  new Block( this,
-				pts,
-				0, dz, 
-				color,
-				true, 
-				false );
-  
-  blockgroup.AppendBlock( newblock );
-  
-  Map();
-  
-  return newblock;
+  blockgroup.AppendBlock( Block( &blockgroup,
+				 pts,
+				 Bounds(0,dz) ));
+
+  Map(); 
 }
 
 
@@ -599,16 +591,19 @@ point_t Model::LocalToGlobal( const point_t& pt) const
 
 std::vector<point_int_t> Model::LocalToPixels( const std::vector<point_t>& local ) const
 {
-  std::vector<point_int_t> global;
+  const size_t sz = local.size();
+  
+  std::vector<point_int_t> global( sz );
   
   const Pose gpose( GetGlobalPose() + geom.pose );
   Pose ptpose;
   
-  FOR_EACH( it, local )
+  for( size_t i=0; i<sz; i++ )
     {
-      ptpose = gpose + Pose( it->x, it->y, 0, 0 );
-      global.push_back( point_int_t( (int32_t)floor( ptpose.x * world->ppm) ,
-				     (int32_t)floor( ptpose.y * world->ppm) ));
+      ptpose = gpose + Pose( local[i].x, local[i].y, 0, 0 );
+      
+      global[i].x = (int32_t)floor( ptpose.x * world->ppm);
+      global[i].y = (int32_t)floor( ptpose.y * world->ppm);
     }
 
   return global;
@@ -669,14 +664,6 @@ void Model::Unsubscribe( void )
     this->Shutdown();
 }
 
-
-// void pose_invert( Pose* pose )
-// {
-//   pose->x = -pose->x;
-//   pose->y = -pose->y;
-//   // pose->a = pose->a;
-// }
-
 void Model::Print( char* prefix ) const
 {
   if( prefix )
@@ -735,8 +722,6 @@ void Model::Shutdown( void )
 void Model::Update( void )
 { 
   //printf( "Q%d model %p %s update\n", event_queue_num, this, Token() );
-
-  //	CallCallbacks( CB_UPDATE );
 	
   last_update = world->sim_time;  
 	
@@ -1249,6 +1234,8 @@ void Model::SetGeom( const Geom& val )
   
   blockgroup.CalcSize();
   
+  //printf( "model %s SetGeom size [%.3f %.3f %.3f]\n", Token(), geom.size.x, geom.size.y, geom.size.z ); 
+
   NeedRedraw();
   
   MapWithChildren(0);
@@ -1540,7 +1527,7 @@ void Model::Load()
 	  has_default_block = false;
 	}
 		
-      blockgroup.LoadBitmap( this, bitmapfile, wf );
+      blockgroup.LoadBitmap( bitmapfile, wf );
     }
   
   if( wf->PropertyExists( wf_entity, "boundary" ))
@@ -1553,13 +1540,17 @@ void Model::Load()
 			 
 	  blockgroup.CalcSize();
 			 
-	  double epsilon = 0.01;	      
-	  Size bgsize = blockgroup.GetSize();
-			 
-	  AddBlockRect(blockgroup.minx,blockgroup.miny, epsilon, bgsize.y, bgsize.z );	      
-	  AddBlockRect(blockgroup.minx,blockgroup.miny, bgsize.x, epsilon, bgsize.z );	      
-	  AddBlockRect(blockgroup.minx,blockgroup.maxy-epsilon, bgsize.x, epsilon, bgsize.z );	      
-	  AddBlockRect(blockgroup.maxx-epsilon,blockgroup.miny, epsilon, bgsize.y, bgsize.z );	      
+	  const double epsilon = 0.01;	      
+	  const bounds3d_t b = blockgroup.BoundingBox();
+	  
+	  const Size size( b.x.max - b.x.min, 
+			   b.y.max - b.y.min, 
+			   b.z.max - b.z.min );
+	  
+	  AddBlockRect(b.x.min, b.y.min, epsilon, size.y, size.z );	      
+	  AddBlockRect(b.x.min, b.y.min, size.x, epsilon, size.z );	      
+	  AddBlockRect(b.x.min, b.y.max-epsilon, size.x, epsilon, size.z );	      
+	  AddBlockRect(b.x.max-epsilon, b.y.min, epsilon, size.y, size.z );	      
 	}     
     }	  
   
